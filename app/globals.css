@@ -68,6 +68,91 @@ h1, h2, h3, .brand {
   position: relative;
 }
 
+/* ---------- 계정 영역 (상단바 오른쪽) ---------- */
+
+.account {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.account-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #55503f;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.role-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #efe8da;
+  color: #6b5f45;
+}
+
+/* 권한이 없는 사용자에게 이유를 알려주는 안내 띠 */
+.banner {
+  margin: 0;
+  padding: 8px 16px;
+  background: #f6efe3;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  color: #6b5f45;
+}
+
+/* ---------- 관리자 화면의 사용자 행 ---------- */
+
+.user-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.user-main { flex: 1; min-width: 0; }
+
+.user-name {
+  margin: 0 0 2px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.user-email {
+  margin: 0;
+  font-size: 12px;
+  color: #857e6f;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.role-legend {
+  margin: 14px 0 16px;
+  padding: 10px 12px;
+  background: #f6efe3;
+  border-radius: 8px;
+}
+
+/* ---------- 폼 메시지 ---------- */
+
+.form-error {
+  font-size: 12px;
+  color: var(--accent);
+  margin: 0 0 10px;
+}
+
+.form-notice {
+  font-size: 12px;
+  color: var(--sage);
+  margin: 0 0 10px;
+}
+
 .map-wrap {
   position: relative;
   width: 100%;
@@ -188,6 +273,20 @@ h1, h2, h3, .brand {
 }
 
 .entry-main { flex: 1; min-width: 0; }
+
+/* 개인별 즐겨찾기 별표 */
+.fav-btn {
+  border: none;
+  background: transparent;
+  font-size: 20px;
+  line-height: 1;
+  padding: 0 2px;
+  cursor: pointer;
+  color: #c9c0ad;
+  flex: 0 0 auto;
+}
+
+.fav-btn.on { color: var(--accent); }
 
 .entry-name {
   font-size: 16px;

@@ -15,11 +15,13 @@ type Props = {
   onMapClick?: (lat: number, lng: number, address?: string) => void;
   onMarkerClick?: (entry: Entry) => void;
   center?: { lat: number; lng: number };
+  /** 내가 즐겨찾기한 entry id 모음 — 마커 색을 개인별로 다르게 표시한다 */
+  favoriteIds: Set<string>;
 };
 
 const DEFAULT_CENTER = { lat: 37.5665, lng: 126.978 }; // 서울시청
 
-export default function MapView({ entries, onMapClick, onMarkerClick, center }: Props) {
+export default function MapView({ entries, onMapClick, onMarkerClick, center, favoriteIds }: Props) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapObj = useRef<any>(null);
   const markers = useRef<any[]>([]);
@@ -97,7 +99,7 @@ export default function MapView({ entries, onMapClick, onMarkerClick, center }: 
         position: new window.naver.maps.LatLng(entry.lat, entry.lng),
         map: mapObj.current,
         title: entry.name,
-        icon: entry.is_favorite
+        icon: favoriteIds.has(entry.id)
           ? {
               content: `<div style="background:#c1440e;color:#fff;border-radius:50%;width:14px;height:14px;border:2px solid #fff;box-shadow:0 0 0 1px #c1440e"></div>`,
               anchor: new window.naver.maps.Point(7, 7),
@@ -110,7 +112,7 @@ export default function MapView({ entries, onMapClick, onMarkerClick, center }: 
       markers.current.push(marker);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entries, ready]);
+  }, [entries, ready, favoriteIds]);
 
   // "내 위치" — 브라우저 위치 권한으로 지도 중심 이동
   const goToMyLocation = () => {

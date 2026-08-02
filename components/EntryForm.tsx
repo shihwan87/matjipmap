@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { supabase, Entry, Group } from "@/lib/supabaseClient";
+import { useAuth } from "./AuthProvider";
 
 type Props = {
   groups: Group[];
@@ -12,21 +13,16 @@ type Props = {
   onClose: () => void;
 };
 
-// 작성자 이름을 브라우저에 기억해 두어 매번 입력하지 않게 한다.
-const AUTHOR_KEY = "matjipmap.author";
-const getSavedAuthor = () =>
-  typeof window === "undefined" ? "" : localStorage.getItem(AUTHOR_KEY) || "";
-
 export default function EntryForm({ groups, initial, pickedCoord, onDone, onClose }: Props) {
+  const { session, profile } = useAuth();
   const [name, setName] = useState(initial?.name || "");
   const [address, setAddress] = useState(initial?.address || pickedCoord?.address || "");
   const [memo, setMemo] = useState(initial?.memo || "");
   const [catchtableUrl, setCatchtableUrl] = useState(initial?.catchtable_url || "");
   const [groupId, setGroupId] = useState(initial?.group_id || groups[0]?.id || "");
-  const [isFavorite, setIsFavorite] = useState(initial?.is_favorite || false);
-  const [author, setAuthor] = useState(initial?.created_by || getSavedAuthor());
   const [saving, setSaving] = useState(false);
   const [geocoding, setGeocoding] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // 좌표: 지도 클릭값 > 기존값 순으로 사용. 주소검색 성공 시 아래 state로 덮어씀.
   const [coord, setCoord] = useState<{ lat: number; lng: number } | null>(
@@ -63,8 +59,7 @@ export default function EntryForm({ groups, initial, pickedCoord, onDone, onClos
   const save = async () => {
     if (!name.trim()) return;
     setSaving(true);
-    const cleanAuthor = author.trim() || null;
-    if (cleanAuthor) localStorage.setItem(AUTHOR_KEY, cleanAuthor);
+    setError(null);
 
     const base = {
       name: name.trim(),
@@ -72,19 +67,29 @@ export default function EntryForm({ groups, initial, pickedCoord, onDone, onClos
       memo: memo.trim() || null,
       catchtable_url: catchtableUrl.trim() || null,
       group_id: groupId || null,
-      is_favorite: isFavorite,
       lat: coord?.lat ?? null,
       lng: coord?.lng ?? null,
       updated_at: new Date().toISOString(),
     };
 
-    if (initial?.id) {
-      await supabase.from("entries").update(base).eq("id", initial.id);
-    } else {
-      // created_by는 신규 등록 때만 기록
-      await supabase.from("entries").insert({ ...base, created_by: cleanAuthor });
-    }
+    // 등록자는 로그인 정보에서 가져온다. 이름은 표시용 스냅샷으로 함께 저장.
+    const { error } = initial?.id
+      ? await supabase.from("entries").update(base).eq("id", initial.id)
+      : await supabase.from("entries").insert({
+          ...base,
+          created_by: session?.user.id ?? null,
+          created_by_name: profile?.display_name ?? null,
+        });
+
     setSaving(false);
+    if (error) {
+      setError(
+        error.message.includes("row-level security")
+          ? "저장 권한이 없습니다. 관리자에게 편집자 권한을 요청해 주세요."
+          : error.message
+      );
+      return;
+    }
     onDone();
   };
 
@@ -115,22 +120,13 @@ export default function EntryForm({ groups, initial, pickedCoord, onDone, onClos
           )}
         </div>
 
-        <div className="row-2">
-          <div className="field">
-            <label>그룹</label>
-            <select value={groupId} onChange={(e) => setGroupId(e.target.value)}>
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>{g.name}</option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label>즐겨찾기</label>
-            <select value={isFavorite ? "1" : "0"} onChange={(e) => setIsFavorite(e.target.value === "1")}>
-              <option value="0">아니오</option>
-              <option value="1">예</option>
-            </select>
-          </div>
+        <div className="field">
+          <label>그룹</label>
+          <select value={groupId} onChange={(e) => setGroupId(e.target.value)}>
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>{g.name}</option>
+            ))}
+          </select>
         </div>
 
         <div className="field">
@@ -143,10 +139,11 @@ export default function EntryForm({ groups, initial, pickedCoord, onDone, onClos
           <input value={catchtableUrl} onChange={(e) => setCatchtableUrl(e.target.value)} placeholder="https://app.catchtable.co.kr/..." />
         </div>
 
-        <div className="field">
-          <label>작성자 (기기에 기억됨)</label>
-          <input value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="예: 아빠, 엄마, 나" />
-        </div>
+        <p className="hint" style={{ marginBottom: 12 }}>
+          즐겨찾기는 사람마다 다릅니다. 저장 후 목록이나 지도에서 ★를 눌러 지정하세요.
+        </p>
+
+        {error && <p className="form-error">{error}</p>}
 
         <button className="btn-primary" disabled={saving || !name.trim()} onClick={save}>
           {saving ? "저장 중..." : "저장"}

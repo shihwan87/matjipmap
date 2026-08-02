@@ -1,4 +1,5 @@
 import "./globals.css";
+import AuthProvider from "@/components/AuthProvider";
 
 // 하위 경로 배포(GitHub Pages)에서도 아이콘·manifest 경로가 맞도록 접두사를 붙인다.
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
@@ -28,7 +29,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <AuthProvider>{children}</AuthProvider>
+      </body>
     </html>
   );
 }
