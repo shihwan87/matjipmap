@@ -1,0 +1,59 @@
+name: Deploy to GitHub Pages
+
+# main 브랜치에 코드가 올라갈 때마다 자동으로 빌드 → 배포된다.
+# Actions 탭에서 "Run workflow"로 수동 실행도 가능.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# GitHub Pages 배포에 필요한 권한
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 배포가 겹치지 않도록 한 번에 하나만 실행
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build (정적 파일 생성)
+        env:
+          # 저장소 Settings > Secrets and variables > Actions 에 등록한 값들
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_NAVER_MAP_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID }}
+          # 저장소 이름이 곧 하위 경로가 된다 (예: /matjipmap).
+          # <사용자명>.github.io 저장소라면 이 줄을 지워 빈 값으로 두면 된다.
+          NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
+        run: npm run build
+
+      - uses: actions/configure-pages@v4
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
