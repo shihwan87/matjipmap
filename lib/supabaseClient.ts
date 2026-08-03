@@ -73,8 +73,11 @@ export type Entry = {
   lng: number | null;
   memo: string | null;
   catchtable_url: string | null;
-  group_id: string | null;
-  /** 업종 큰 분류. 검색 등록 시 자동 추정되고, 사용자가 바꿀 수 있다 */
+  /**
+   * 그룹은 여러 개 붙을 수 있어 이 타입에 담지 않는다.
+   * entry_groups 테이블을 따로 읽어 Map<entryId, groupId[]> 형태로 다룬다.
+   */
+  /** 업종 큰 분류. 맛집 하나에 하나만. 검색 등록 시 자동 추정되고 수정 가능 */
   cuisine: string | null;
   /** 네이버 검색이 준 원본 분류 문자열 (표시용) */
   category_raw: string | null;
@@ -92,6 +95,15 @@ export type Group = {
   /** 목록에 보여줄 순서. 그룹 관리 화면에서 바꾼다 */
   sort_order: number;
 };
+
+/** 맛집 ↔ 그룹 연결 한 줄 */
+export type EntryGroup = {
+  entry_id: string;
+  group_id: string;
+};
+
+/** 맛집 id → 그룹 id 목록 */
+export type GroupMap = Map<string, string[]>;
 
 export type Profile = {
   id: string;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { supabase, Entry, Group, ROLE_LABEL } from "@/lib/supabaseClient";
+import { supabase, Entry, Group, GroupMap, EntryGroup, ROLE_LABEL } from "@/lib/supabaseClient";
 import MapView from "@/components/MapView";
 import EntryList from "@/components/EntryList";
 import EntryForm from "@/components/EntryForm";
@@ -18,6 +18,8 @@ export default function Home() {
   const [tab, setTab] = useState<"map" | "list">("map");
   const [entries, setEntries] = useState<Entry[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
+  // 맛집 id → 붙어 있는 그룹 id 목록 (한 맛집이 여러 그룹에 속할 수 있다)
+  const [groupMap, setGroupMap] = useState<GroupMap>(new Map());
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [activeGroup, setActiveGroup] = useState<string | "all" | "fav" | "none">("all");
   const [activeCuisine, setActiveCuisine] = useState<string>("all");
@@ -31,7 +33,7 @@ export default function Home() {
 
   // 맛집·그룹은 로그인 여부와 무관하게 누구나 읽을 수 있다.
   const load = useCallback(async () => {
-    const [{ data: e }, { data: g }] = await Promise.all([
+    const [{ data: e }, { data: g }, { data: eg }] = await Promise.all([
       supabase.from("entries").select("*").order("created_at", { ascending: false }),
       // 그룹은 사용자가 지정한 순서(sort_order)를 따른다
       supabase
@@ -39,9 +41,18 @@ export default function Home() {
         .select("*")
         .order("sort_order", { ascending: true })
         .order("created_at", { ascending: true }),
+      supabase.from("entry_groups").select("*"),
     ]);
     setEntries(e || []);
     setGroups(g || []);
+
+    const map: GroupMap = new Map();
+    ((eg as EntryGroup[]) || []).forEach((row) => {
+      const list = map.get(row.entry_id) ?? [];
+      list.push(row.group_id);
+      map.set(row.entry_id, list);
+    });
+    setGroupMap(map);
   }, []);
 
   // 즐겨찾기는 개인별이므로 로그인한 사용자의 것만 가져온다.
@@ -96,10 +107,11 @@ export default function Home() {
 
   // 지도에도 목록과 같은 필터를 적용한다 (그룹과 업종은 함께 적용)
   const shownEntries = entries.filter((e) => {
+    const ids = groupMap.get(e.id) ?? [];
     if (activeGroup === "fav" && !favoriteIds.has(e.id)) return false;
-    if (activeGroup === "none" && e.group_id) return false;
+    if (activeGroup === "none" && ids.length > 0) return false;
     if (activeGroup !== "all" && activeGroup !== "fav" && activeGroup !== "none"
-        && e.group_id !== activeGroup) return false;
+        && !ids.includes(activeGroup)) return false;
 
     if (activeCuisine === "none" && e.cuisine) return false;
     if (activeCuisine !== "all" && activeCuisine !== "none" && e.cuisine !== activeCuisine) return false;
@@ -154,6 +166,7 @@ export default function Home() {
           <EntryList
             entries={entries}
             groups={groups}
+            groupMap={groupMap}
             activeGroup={activeGroup}
             onFilterChange={setActiveGroup}
             activeCuisine={activeCuisine}
@@ -176,6 +189,7 @@ export default function Home() {
         <EntryForm
           groups={groups}
           initial={editing || undefined}
+          initialGroupIds={editing ? groupMap.get(editing.id) ?? [] : []}
           pickedCoord={pickedCoord}
           onDone={() => { setEditing(undefined); load(); }}
           onClose={() => setEditing(undefined)}
@@ -197,7 +211,7 @@ export default function Home() {
       {showGroups && canEdit && (
         <GroupPanel
           groups={groups}
-          entries={entries}
+          groupMap={groupMap}
           onChanged={load}
           onClose={() => setShowGroups(false)}
         />

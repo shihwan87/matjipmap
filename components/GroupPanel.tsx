@@ -1,18 +1,18 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { supabase, Entry, Group } from "@/lib/supabaseClient";
+import { supabase, Group, GroupMap } from "@/lib/supabaseClient";
 
 type Props = {
   groups: Group[];
-  /** 그룹별 사용 개수를 세기 위해 필요 */
-  entries: Entry[];
+  /** 맛집 id → 그룹 id 목록. 그룹별 사용 개수를 세는 데 쓴다 */
+  groupMap: GroupMap;
   /** 추가·수정·삭제 후 목록을 다시 불러오기 위한 콜백 */
   onChanged: () => void;
   onClose: () => void;
 };
 
-export default function GroupPanel({ groups, entries, onChanged, onClose }: Props) {
+export default function GroupPanel({ groups, groupMap, onChanged, onClose }: Props) {
   const [newName, setNewName] = useState("");
   // 이름을 고치는 중인 값. { 그룹id: 입력값 }
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -22,11 +22,11 @@ export default function GroupPanel({ groups, entries, onChanged, onClose }: Prop
   // 그룹마다 몇 곳이 들어있는지 (삭제 시 영향 범위를 보여주기 위해)
   const counts = useMemo(() => {
     const map: Record<string, number> = {};
-    entries.forEach((e) => {
-      if (e.group_id) map[e.group_id] = (map[e.group_id] ?? 0) + 1;
+    groupMap.forEach((ids) => {
+      ids.forEach((id) => { map[id] = (map[id] ?? 0) + 1; });
     });
     return map;
-  }, [entries]);
+  }, [groupMap]);
 
   const nameExists = (name: string, exceptId?: string) =>
     groups.some((g) => g.id !== exceptId && g.name.trim() === name.trim());
@@ -99,7 +99,7 @@ export default function GroupPanel({ groups, entries, onChanged, onClose }: Prop
   const remove = async (group: Group) => {
     const used = counts[group.id] ?? 0;
     const message = used > 0
-      ? `"${group.name}" 그룹을 삭제할까요?\n\n이 그룹에 속한 맛집 ${used}곳은 지워지지 않고, 그룹만 "없음"이 됩니다.`
+      ? `"${group.name}" 그룹을 삭제할까요?\n\n이 그룹에 속한 맛집 ${used}곳은 지워지지 않고, 이 그룹 표시만 사라집니다.`
       : `"${group.name}" 그룹을 삭제할까요?`;
     if (!confirm(message)) return;
 

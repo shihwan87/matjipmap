@@ -9,6 +9,8 @@ type Props = {
   initial?: Partial<Entry>;
   // 지도 클릭으로 넘어온 좌표 + (가능하면) 주소
   pickedCoord?: { lat: number; lng: number; address?: string } | null;
+  /** 수정할 때 이미 붙어 있는 그룹 id 목록 */
+  initialGroupIds?: string[];
   onDone: () => void;
   onClose: () => void;
 };
@@ -24,13 +26,16 @@ type PlaceHit = {
   lng: number | null;
 };
 
-export default function EntryForm({ groups, initial, pickedCoord, onDone, onClose }: Props) {
+export default function EntryForm({
+  groups, initial, pickedCoord, initialGroupIds, onDone, onClose,
+}: Props) {
   const { session, profile } = useAuth();
   const [name, setName] = useState(initial?.name || "");
   const [address, setAddress] = useState(initial?.address || pickedCoord?.address || "");
   const [memo, setMemo] = useState(initial?.memo || "");
   const [catchtableUrl, setCatchtableUrl] = useState(initial?.catchtable_url || "");
-  const [groupId, setGroupId] = useState(initial?.group_id || groups[0]?.id || "");
+  // 그룹은 여러 개 고를 수 있다. 선택된 id 모음으로 관리한다.
+  const [groupIds, setGroupIds] = useState<Set<string>>(new Set(initialGroupIds ?? []));
   // 업종. 검색으로 등록하면 자동으로 채워지고, 직접 고를 수도 있다.
   const [cuisine, setCuisine] = useState(initial?.cuisine || "");
   // 네이버가 준 원본 분류 (예: "음식점>한식>냉면"). 표시·보관용.
@@ -141,6 +146,40 @@ export default function EntryForm({ groups, initial, pickedCoord, onDone, onClos
     setPlaceQuery("");
   };
 
+  const toggleGroup = (id: string) => {
+    setGroupIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  /** 맛집에 붙은 그룹을 화면에서 고른 대로 맞춘다 (빠진 건 지우고, 새로 고른 건 넣는다). */
+  const syncGroups = async (entryId: string): Promise<string | null> => {
+    const before = new Set(initialGroupIds ?? []);
+    const after = groupIds;
+
+    const toRemove = [...before].filter((id) => !after.has(id));
+    const toAdd = [...after].filter((id) => !before.has(id));
+
+    if (toRemove.length > 0) {
+      const { error } = await supabase
+        .from("entry_groups")
+        .delete()
+        .eq("entry_id", entryId)
+        .in("group_id", toRemove);
+      if (error) return error.message;
+    }
+    if (toAdd.length > 0) {
+      const { error } = await supabase
+        .from("entry_groups")
+        .insert(toAdd.map((group_id) => ({ entry_id: entryId, group_id })));
+      if (error) return error.message;
+    }
+    return null;
+  };
+
   const save = async () => {
     if (!name.trim()) return;
     setSaving(true);
@@ -151,7 +190,6 @@ export default function EntryForm({ groups, initial, pickedCoord, onDone, onClos
       address: address.trim() || null,
       memo: memo.trim() || null,
       catchtable_url: catchtableUrl.trim() || null,
-      group_id: groupId || null,
       cuisine: cuisine || null,
       category_raw: categoryRaw.trim() || null,
       lat: coord?.lat ?? null,
@@ -160,21 +198,33 @@ export default function EntryForm({ groups, initial, pickedCoord, onDone, onClos
     };
 
     // 등록자는 로그인 정보에서 가져온다. 이름은 표시용 스냅샷으로 함께 저장.
-    const { error } = initial?.id
-      ? await supabase.from("entries").update(base).eq("id", initial.id)
-      : await supabase.from("entries").insert({
-          ...base,
-          created_by: session?.user.id ?? null,
-          created_by_name: profile?.display_name ?? null,
-        });
+    const { data, error } = initial?.id
+      ? await supabase.from("entries").update(base).eq("id", initial.id).select("id").single()
+      : await supabase
+          .from("entries")
+          .insert({
+            ...base,
+            created_by: session?.user.id ?? null,
+            created_by_name: profile?.display_name ?? null,
+          })
+          .select("id")
+          .single();
 
-    setSaving(false);
     if (error) {
+      setSaving(false);
       setError(
         error.message.includes("row-level security")
           ? "저장 권한이 없습니다. 관리자에게 편집자 권한을 요청해 주세요."
           : error.message
       );
+      return;
+    }
+
+    // 맛집을 저장한 뒤에야 그룹 연결을 붙일 수 있다 (새 맛집은 여기서 id가 정해지므로).
+    const groupError = await syncGroups((data as { id: string }).id);
+    setSaving(false);
+    if (groupError) {
+      setError("맛집은 저장됐지만 그룹 연결에 실패했습니다: " + groupError);
       return;
     }
     onDone();
@@ -245,26 +295,38 @@ export default function EntryForm({ groups, initial, pickedCoord, onDone, onClos
           )}
         </div>
 
-        <div className="row-2">
-          <div className="field">
-            <label>그룹</label>
-            <select value={groupId} onChange={(e) => setGroupId(e.target.value)}>
-              <option value="">미분류</option>
+        <div className="field">
+          <label>그룹 <span style={{ color: "#a99f8c" }}>(여러 개 선택 가능)</span></label>
+          {groups.length === 0 ? (
+            <p className="hint">아직 그룹이 없습니다. 목록 탭의 [그룹] 버튼에서 만들 수 있어요.</p>
+          ) : (
+            <div className="kind-row">
               {groups.map((g) => (
-                <option key={g.id} value={g.id}>{g.name}</option>
+                <button
+                  key={g.id}
+                  type="button"
+                  className={`chip ${groupIds.has(g.id) ? "active" : ""}`}
+                  onClick={() => toggleGroup(g.id)}
+                >
+                  {g.name}
+                </button>
               ))}
-            </select>
-          </div>
-          <div className="field">
-            <label>업종</label>
-            <select value={cuisine} onChange={(e) => setCuisine(e.target.value)}>
-              <option value="">미분류</option>
-              {CUISINES.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-            {categoryRaw && <p className="hint">네이버 분류: {categoryRaw}</p>}
-          </div>
+            </div>
+          )}
+          {groupIds.size === 0 && groups.length > 0 && (
+            <p className="hint">아무것도 고르지 않으면 &ldquo;미분류&rdquo;가 됩니다.</p>
+          )}
+        </div>
+
+        <div className="field">
+          <label>업종 <span style={{ color: "#a99f8c" }}>(하나만)</span></label>
+          <select value={cuisine} onChange={(e) => setCuisine(e.target.value)}>
+            <option value="">미분류</option>
+            {CUISINES.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+          {categoryRaw && <p className="hint">네이버 분류: {categoryRaw}</p>}
         </div>
 
         <div className="field">

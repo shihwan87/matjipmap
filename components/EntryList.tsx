@@ -1,12 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Entry, Group, supabase, CUISINES } from "@/lib/supabaseClient";
+import { Entry, Group, GroupMap, supabase, CUISINES } from "@/lib/supabaseClient";
 import { useAuth } from "./AuthProvider";
 
 type Props = {
   entries: Entry[];
   groups: Group[];
+  /** 맛집 id → 붙어 있는 그룹 id 목록 */
+  groupMap: GroupMap;
   /** "all" 전체 · "fav" 내 즐겨찾기 · "none" 그룹 미분류 · 그 외는 그룹 id */
   activeGroup: string | "all" | "fav" | "none";
   onFilterChange: (v: string | "all" | "fav" | "none") => void;
@@ -33,6 +35,7 @@ const naverMapLink = (entry: Entry) =>
 export default function EntryList({
   entries,
   groups,
+  groupMap,
   activeGroup,
   onFilterChange,
   activeCuisine,
@@ -64,16 +67,22 @@ export default function EntryList({
     onChanged();
   };
 
-  const groupName = (id: string | null) => groups.find((g) => g.id === id)?.name;
+  /** 맛집에 붙은 그룹 이름들 (그룹 관리에서 정한 순서를 따른다) */
+  const groupNamesOf = (entryId: string): string[] => {
+    const ids = new Set(groupMap.get(entryId) ?? []);
+    return groups.filter((g) => ids.has(g.id)).map((g) => g.name);
+  };
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     const filtered = entries.filter((e) => {
       // 1) 그룹 · 즐겨찾기 (즐겨찾기는 "내" 즐겨찾기 기준)
+      //    그룹은 여러 개 붙을 수 있으므로 "포함하는지"로 판단한다.
+      const ids = groupMap.get(e.id) ?? [];
       if (activeGroup === "fav" && !favoriteIds.has(e.id)) return false;
-      if (activeGroup === "none" && e.group_id) return false;
+      if (activeGroup === "none" && ids.length > 0) return false;
       if (activeGroup !== "all" && activeGroup !== "fav" && activeGroup !== "none"
-          && e.group_id !== activeGroup) return false;
+          && !ids.includes(activeGroup)) return false;
 
       // 2) 업종 — 두 필터는 함께(AND) 적용된다
       if (activeCuisine === "none" && e.cuisine) return false;
@@ -92,7 +101,7 @@ export default function EntryList({
     }
     // "recent"는 부모에서 이미 created_at 내림차순으로 넘어오므로 그대로 사용
     return sorted;
-  }, [entries, activeGroup, activeCuisine, query, sort, favoriteIds]);
+  }, [entries, activeGroup, activeCuisine, query, sort, favoriteIds, groupMap]);
 
   // 업종 칩에 개수를 함께 보여주면 어디에 뭐가 있는지 한눈에 들어온다.
   const cuisineCounts = useMemo(() => {
@@ -193,7 +202,9 @@ export default function EntryList({
                   <span className="tag warn">지도 표시 안 됨 · 좌표 없음</span>
                 )}
                 {entry.cuisine && <span className="tag cuisine">{entry.cuisine}</span>}
-                {groupName(entry.group_id) && <span className="tag">{groupName(entry.group_id)}</span>}
+                {groupNamesOf(entry.id).map((n) => (
+                  <span className="tag" key={n}>{n}</span>
+                ))}
                 {entry.created_by_name && <span className="tag">등록: {entry.created_by_name}</span>}
                 <a className="tag" href={naverMapLink(entry)} target="_blank" rel="noreferrer">네이버지도</a>
                 {entry.catchtable_url && (

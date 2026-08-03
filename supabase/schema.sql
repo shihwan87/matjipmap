@@ -34,8 +34,8 @@ create table entries (
   lng double precision,
   memo text,
   catchtable_url text,
-  group_id uuid references groups(id) on delete set null,
-  -- 업종 큰 분류 (한식/일식/카페·디저트 ...). 목록 필터에 쓴다.
+  -- 그룹은 여러 개 붙을 수 있어 별도 연결 테이블(entry_groups)로 관리한다.
+  -- 업종 큰 분류 (한식/일식/카페·디저트 ...). 맛집 하나에 하나만.
   -- 분류를 나중에 바꾸기 쉽도록 CHECK 제약은 걸지 않는다.
   cuisine text,
   -- 네이버 검색이 준 원본 분류 (예: "음식점>한식>냉면"). 세부 정보 보존용.
@@ -56,6 +56,15 @@ create table profiles (
   role text not null default 'viewer' check (role in ('admin', 'editor', 'viewer')),
   created_at timestamptz default now()
 );
+
+-- 맛집 ↔ 그룹 연결. 한 맛집이 여러 그룹에 속할 수 있다.
+create table entry_groups (
+  entry_id uuid not null references entries(id) on delete cascade,
+  group_id uuid not null references groups(id) on delete cascade,
+  primary key (entry_id, group_id)
+);
+
+create index entry_groups_group_idx on entry_groups (group_id);
 
 -- 개인별 즐겨찾기 (사람마다 다른 별표)
 create table favorites (
@@ -152,6 +161,7 @@ alter table entries enable row level security;
 alter table profiles enable row level security;
 alter table favorites enable row level security;
 alter table feedback enable row level security;
+alter table entry_groups enable row level security;
 
 -- 맛집: 누구나 읽기, 편집자 이상만 쓰기
 create policy "entries_select_public" on entries
@@ -161,6 +171,14 @@ create policy "entries_insert_editor" on entries
 create policy "entries_update_editor" on entries
   for update using (public.can_edit()) with check (public.can_edit());
 create policy "entries_delete_editor" on entries
+  for delete using (public.can_edit());
+
+-- 맛집↔그룹 연결: 누구나 읽기, 편집자 이상만 쓰기 (entries와 같은 기준)
+create policy "entry_groups_select_public" on entry_groups
+  for select using (true);
+create policy "entry_groups_insert_editor" on entry_groups
+  for insert with check (public.can_edit());
+create policy "entry_groups_delete_editor" on entry_groups
   for delete using (public.can_edit());
 
 -- 그룹: 누구나 읽기, 편집자 이상만 쓰기
