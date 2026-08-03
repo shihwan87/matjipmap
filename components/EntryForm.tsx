@@ -13,6 +13,17 @@ type Props = {
   onClose: () => void;
 };
 
+/** search-place 중계 함수가 돌려주는 검색 결과 한 건 */
+type PlaceHit = {
+  name: string;
+  address: string;
+  jibunAddress: string;
+  category: string;
+  telephone: string;
+  lat: number | null;
+  lng: number | null;
+};
+
 export default function EntryForm({ groups, initial, pickedCoord, onDone, onClose }: Props) {
   const { session, profile } = useAuth();
   const [name, setName] = useState(initial?.name || "");
@@ -24,7 +35,13 @@ export default function EntryForm({ groups, initial, pickedCoord, onDone, onClos
   const [geocoding, setGeocoding] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 좌표: 지도 클릭값 > 기존값 순으로 사용. 주소검색 성공 시 아래 state로 덮어씀.
+  // 가게 이름 검색 상태
+  const [placeQuery, setPlaceQuery] = useState("");
+  const [places, setPlaces] = useState<PlaceHit[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+
+  // 좌표: 지도 클릭값 > 기존값 순으로 사용. 주소검색·장소검색 성공 시 덮어씀.
   const [coord, setCoord] = useState<{ lat: number; lng: number } | null>(
     pickedCoord
       ? { lat: pickedCoord.lat, lng: pickedCoord.lng }
@@ -33,27 +50,86 @@ export default function EntryForm({ groups, initial, pickedCoord, onDone, onClos
       : null
   );
 
-  // 주소 → 좌표 (Naver Geocoding). NCP에서 Geocoding API가 켜져 있고 지도 SDK가
-  // 로드된 경우에만 동작. 실패하면 조용히 주소만 저장한다.
-  const geocodeAddress = () => {
+  /**
+   * 주소 문자열 → 좌표 (Naver Geocoding).
+   * NCP에서 Geocoding API가 켜져 있고 지도 SDK가 로드된 경우에만 동작한다.
+   * 호출 가능하면 true를 반환한다.
+   */
+  const geocodeText = (text: string, opts?: { alertOnFail?: boolean }): boolean => {
     const svc = (window as any).naver?.maps?.Service;
-    if (!address.trim() || !svc?.geocode) {
-      alert("주소 검색은 지도 탭을 한 번 연 뒤 사용할 수 있어요. 좌표는 지도를 탭해 지정할 수도 있습니다.");
-      return;
-    }
+    if (!text.trim() || !svc?.geocode) return false;
+
     setGeocoding(true);
-    svc.geocode({ query: address.trim() }, (status: any, response: any) => {
+    svc.geocode({ query: text.trim() }, (status: any, response: any) => {
       setGeocoding(false);
       if (status !== svc.Status.OK) return;
       const item = response?.v2?.addresses?.[0];
       if (!item) {
-        alert("해당 주소의 좌표를 찾지 못했어요. 지도를 직접 탭해 지정해 주세요.");
+        if (opts?.alertOnFail) {
+          alert("해당 주소의 좌표를 찾지 못했어요. 지도를 직접 탭해 지정해 주세요.");
+        }
         return;
       }
       setCoord({ lat: parseFloat(item.y), lng: parseFloat(item.x) });
       const road = item.roadAddress || item.jibunAddress;
       if (road) setAddress(road);
     });
+    return true;
+  };
+
+  const geocodeAddress = () => {
+    const ok = geocodeText(address, { alertOnFail: true });
+    if (!ok) {
+      alert("주소 검색은 지도 탭을 한 번 연 뒤 사용할 수 있어요. 좌표는 지도를 탭해 지정할 수도 있습니다.");
+    }
+  };
+
+  /** 가게 이름으로 검색 — Supabase 중계 함수를 거쳐 네이버 지역검색을 부른다. */
+  const searchPlaces = async () => {
+    const q = placeQuery.trim();
+    if (!q) return;
+    setSearching(true);
+    setSearchError(null);
+    setPlaces(null);
+
+    const { data, error } = await supabase.functions.invoke("search-place", {
+      body: { query: q },
+    });
+    setSearching(false);
+
+    if (error) {
+      // 함수가 아직 배포되지 않았거나 권한/네트워크 문제
+      let message = "검색에 실패했습니다.";
+      try {
+        const body = await (error as any).context?.json?.();
+        if (body?.error) message = body.error;
+      } catch {
+        // 응답 본문을 읽을 수 없으면 기본 메시지 유지
+      }
+      setSearchError(message);
+      return;
+    }
+    if (data?.error) {
+      setSearchError(data.error);
+      return;
+    }
+    setPlaces(data?.places ?? []);
+  };
+
+  /** 검색 결과를 폼에 채워 넣는다. */
+  const pickPlace = (p: PlaceHit) => {
+    setName(p.name);
+    const addr = p.address || p.jibunAddress;
+    setAddress(addr);
+
+    if (p.lat != null && p.lng != null) {
+      setCoord({ lat: p.lat, lng: p.lng });
+    } else {
+      // 검색 결과의 좌표 형식을 알 수 없는 경우 주소로 보정한다.
+      geocodeText(addr);
+    }
+    setPlaces(null);
+    setPlaceQuery("");
   };
 
   const save = async () => {
@@ -97,6 +173,44 @@ export default function EntryForm({ groups, initial, pickedCoord, onDone, onClos
     <div className="sheet-backdrop" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
         <h3 style={{ marginTop: 0 }}>{initial?.id ? "맛집 수정" : "맛집 등록"}</h3>
+
+        {/* 가게 이름으로 찾아 한 번에 채우기 */}
+        <div className="field">
+          <label>가게 이름으로 검색</label>
+          <div className="input-with-btn">
+            <input
+              value={placeQuery}
+              onChange={(e) => setPlaceQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  searchPlaces();
+                }
+              }}
+              placeholder="예: 성수동 밀도, 광화문 미진"
+            />
+            <button type="button" className="mini-btn" onClick={searchPlaces} disabled={searching}>
+              {searching ? "검색…" : "검색"}
+            </button>
+          </div>
+          {searchError && <p className="form-error" style={{ marginTop: 6 }}>{searchError}</p>}
+          {places && places.length === 0 && <p className="hint">검색 결과가 없습니다.</p>}
+          {places && places.length > 0 && (
+            <ul className="place-results">
+              {places.map((p, i) => (
+                <li key={i}>
+                  <button type="button" className="place-hit" onClick={() => pickPlace(p)}>
+                    <span className="place-name">{p.name}</span>
+                    <span className="place-addr">{p.address || p.jibunAddress}</span>
+                    {p.category && <span className="place-cat">{p.category}</span>}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <hr className="divider" />
 
         <div className="field">
           <label>이름 *</label>

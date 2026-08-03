@@ -262,6 +262,45 @@ h1, h2, h3, .brand {
   cursor: default;
 }
 
+/* ---------- 가게 이름 검색 결과 ---------- */
+
+.place-results {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.place-results li + li { border-top: 1px solid var(--line); }
+
+.place-hit {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 9px 11px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.place-hit:hover { background: #f6efe3; }
+
+.place-name { font-size: 14px; font-weight: 600; color: var(--ink); }
+.place-addr { font-size: 12px; color: #857e6f; }
+.place-cat { font-size: 11px; color: #a99f8c; }
+
+.divider {
+  border: none;
+  border-top: 1px solid var(--line);
+  margin: 14px 0;
+}
+
 .chip {
   border: 1px solid var(--line);
   background: #fff;
