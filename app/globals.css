@@ -386,28 +386,33 @@ h1, h2, h3, .brand {
   text-align: right;
 }
 
-/* 순서 바꾸기 (▲▼) */
-.order-btns {
-  display: flex;
-  flex-direction: column;
+/* 끌어서 순서 바꾸기 */
+.drag-handle {
   flex: 0 0 auto;
-}
-
-.order-btn {
   border: 1px solid var(--line);
   background: #fff;
-  color: var(--ink);
-  width: 22px;
-  height: 17px;
-  font-size: 8px;
+  color: #a99f8c;
+  border-radius: 6px;
+  width: 26px;
+  height: 32px;
+  font-size: 13px;
   line-height: 1;
   padding: 0;
-  cursor: pointer;
+  cursor: grab;
+  /* 손가락으로 끌 때 화면이 같이 스크롤되지 않게 한다 (모바일에 필수) */
+  touch-action: none;
+  user-select: none;
 }
 
-.order-btn:first-child { border-radius: 5px 5px 0 0; border-bottom: none; }
-.order-btn:last-child { border-radius: 0 0 5px 5px; }
-.order-btn:disabled { opacity: 0.3; cursor: default; }
+.drag-handle:active { cursor: grabbing; }
+.drag-handle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* 끌고 있는 행을 눈에 띄게 */
+.group-row.dragging {
+  background: #f6efe3;
+  border-radius: 6px;
+  box-shadow: 0 2px 10px rgba(27, 36, 48, 0.14);
+}
 
 .chip {
   border: 1px solid var(--line);
