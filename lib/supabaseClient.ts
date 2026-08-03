@@ -5,6 +5,33 @@ const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 export const supabase = createClient(url, anonKey);
 
+/**
+ * 이름으로 로그인하기 위한 내부 도메인.
+ *
+ * Supabase 로그인은 이메일이 반드시 있어야 해서, 이름만 쓰는 계정은
+ * 이름을 이 도메인의 주소로 바꿔 저장한다. 사용자는 이 주소를 볼 일이 없다.
+ * 메일이 실제로 오가지 않도록, 메일 서버가 없는 도메인을 쓴다.
+ */
+export const ACCOUNT_DOMAIN = "shihwan87.github.io";
+
+/**
+ * 이름 → 내부 이메일 주소.
+ * 한글·공백이 이메일 형식에 어긋나므로 UTF-8 바이트를 16진수로 바꿔 담는다.
+ * 예: "아빠" → "u-ec9584eb998c@shihwan87.github.io"
+ */
+export function usernameToEmail(name: string): string {
+  const normalized = name.trim().normalize("NFC").toLowerCase();
+  const hex = Array.from(new TextEncoder().encode(normalized))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  return `u-${hex}@${ACCOUNT_DOMAIN}`;
+}
+
+/** 이름으로 가입한 계정인지 (= 실제 이메일이 없는 계정인지) */
+export function isNameAccount(email: string | null | undefined): boolean {
+  return !!email && email.endsWith(`@${ACCOUNT_DOMAIN}`);
+}
+
 /** 권한 등급. 위로 갈수록 강함. */
 export type Role = "admin" | "editor" | "viewer";
 

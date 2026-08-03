@@ -565,6 +565,19 @@ h1, h2, h3, .brand {
 
 .field textarea { resize: vertical; min-height: 60px; }
 
+/* 체크박스와 설명을 한 줄로 */
+.check-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.check-line input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+
 .row-2 { display: flex; gap: 10px; }
 .row-2 .field { flex: 1; }
 

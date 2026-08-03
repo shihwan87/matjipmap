@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { supabase, Profile, Role } from "@/lib/supabaseClient";
+import { supabase, Profile, Role, usernameToEmail } from "@/lib/supabaseClient";
 
 type AuthValue = {
   session: Session | null;
@@ -15,8 +15,10 @@ type AuthValue = {
   isAdmin: boolean;
   /** 최초 세션 확인이 끝났는지 — 끝나기 전에는 로그인 버튼을 깜빡이지 않게 한다 */
   ready: boolean;
-  signIn: (email: string, password: string) => Promise<string | null>;
-  signUp: (email: string, password: string, displayName: string) => Promise<string | null>;
+  /** 이름 또는 이메일로 로그인 */
+  signIn: (identifier: string, password: string) => Promise<string | null>;
+  /** 이름으로 가입. 이메일을 함께 주면 그 이메일 계정으로 만든다(관리자용) */
+  signUp: (displayName: string, password: string, email?: string) => Promise<string | null>;
   signOut: () => Promise<void>;
 };
 
@@ -96,24 +98,40 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   }, [userId]);
 
   // 아래 세 함수는 실패 시 사용자에게 보여줄 한국어 메시지를, 성공 시 null을 반환한다.
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+
+  const signIn = async (identifier: string, password: string) => {
+    const id = identifier.trim();
+    // "@"가 있으면 이메일로, 없으면 이름으로 본다.
+    const email = id.includes("@") ? id : usernameToEmail(id);
+
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (!error) return null;
-    if (error.message.includes("Invalid login credentials")) return "이메일 또는 비밀번호가 올바르지 않습니다.";
+    if (error.message.includes("Invalid login credentials")) return "이름(또는 이메일)이나 비밀번호가 올바르지 않습니다.";
     if (error.message.includes("Email not confirmed")) return "이메일 인증이 완료되지 않았습니다. 메일함을 확인해 주세요.";
     return error.message;
   };
 
-  const signUp = async (email: string, password: string, displayName: string) => {
+  const signUp = async (displayName: string, password: string, email?: string) => {
+    const name = displayName.trim();
+    const realEmail = email?.trim();
+    // 이메일을 적었으면 그대로 쓰고(관리자가 될 수 있는 계정),
+    // 안 적었으면 이름을 내부 주소로 바꿔 쓴다.
+    const loginEmail = realEmail ? realEmail : usernameToEmail(name);
+
     const { error } = await supabase.auth.signUp({
-      email: email.trim(),
+      email: loginEmail,
       password,
       // display_name은 가입 트리거가 profiles에 복사한다.
-      options: { data: { display_name: displayName.trim() || email.split("@")[0] } },
+      options: { data: { display_name: name } },
     });
     if (!error) return null;
-    if (error.message.includes("already registered")) return "이미 가입된 이메일입니다. 로그인해 주세요.";
+    if (error.message.includes("already registered")) {
+      return realEmail ? "이미 가입된 이메일입니다. 로그인해 주세요." : "이미 쓰고 있는 이름입니다. 다른 이름을 써주세요.";
+    }
     if (error.message.includes("at least")) return "비밀번호는 6자 이상이어야 합니다.";
+    if (error.message.includes("email_address_invalid") || error.message.includes("is invalid")) {
+      return "이 이름은 쓸 수 없습니다. 한글이나 영문 이름을 써주세요.";
+    }
     return error.message;
   };
 

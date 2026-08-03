@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase, Profile, Role, ROLE_LABEL } from "@/lib/supabaseClient";
+import { supabase, Profile, Role, ROLE_LABEL, isNameAccount } from "@/lib/supabaseClient";
 import { useAuth } from "./AuthProvider";
 
 const ROLES: Role[] = ["admin", "editor", "viewer"];
@@ -35,6 +35,12 @@ export default function AdminPanel({ onClose }: { onClose: () => void }) {
 
   const changeRole = async (target: Profile, role: Role) => {
     if (role === target.role) return;
+
+    // 관리자는 실제 이메일로 가입한 계정만 될 수 있다 (DB에서도 같은 규칙을 강제한다).
+    if (role === "admin" && isNameAccount(target.email)) {
+      alert("이름으로 가입한 계정은 관리자가 될 수 없습니다.\n\n관리자 권한이 필요하면 이메일로 새로 가입해 주세요.");
+      return;
+    }
 
     // 관리자가 자기 자신을 강등하면 아무도 권한을 되돌릴 수 없게 될 수 있다.
     if (target.id === me?.id) {
@@ -75,7 +81,9 @@ export default function AdminPanel({ onClose }: { onClose: () => void }) {
                 {row.display_name || "(이름 없음)"}
                 {row.id === me?.id && <span className="tag" style={{ marginLeft: 6 }}>나</span>}
               </p>
-              <p className="user-email">{row.email}</p>
+              <p className="user-email">
+                {isNameAccount(row.email) ? "이름으로 가입" : row.email}
+              </p>
             </div>
             <select
               className="sort-select"
@@ -84,7 +92,9 @@ export default function AdminPanel({ onClose }: { onClose: () => void }) {
               onChange={(e) => changeRole(row, e.target.value as Role)}
             >
               {ROLES.map((r) => (
-                <option key={r} value={r}>{ROLE_LABEL[r]}</option>
+                <option key={r} value={r} disabled={r === "admin" && isNameAccount(row.email)}>
+                  {ROLE_LABEL[r]}
+                </option>
               ))}
             </select>
           </div>

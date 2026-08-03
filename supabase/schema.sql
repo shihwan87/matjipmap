@@ -152,6 +152,27 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
+-- 이름으로만 가입한 계정은 내부적으로 가짜 이메일(u-xxxx@shihwan87.github.io)을
+-- 쓴다. 비밀번호를 잃어버려도 메일로 되찾을 수 없으므로 관리자로 두지 않는다.
+create or replace function public.enforce_admin_needs_real_email()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.role = 'admin'
+     and (new.email is null or new.email like '%@shihwan87.github.io') then
+    raise exception '관리자는 실제 이메일로 가입한 계정만 될 수 있습니다.';
+  end if;
+  return new;
+end
+$$;
+
+create trigger profiles_admin_email_check
+  before insert or update on profiles
+  for each row execute function public.enforce_admin_needs_real_email();
+
 -- ------------------------------------------------------------
 -- 4. RLS 정책
 -- ------------------------------------------------------------
