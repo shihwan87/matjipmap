@@ -48,10 +48,35 @@ export default function GroupPanel({ groups, entries, onChanged, onClose }: Prop
     }
     setBusyId("new");
     setError(null);
-    const { error } = await supabase.from("groups").insert({ name });
+    // 새 그룹은 맨 뒤에 붙인다
+    const nextOrder = Math.max(0, ...groups.map((g) => g.sort_order ?? 0)) + 1;
+    const { error } = await supabase.from("groups").insert({ name, sort_order: nextOrder });
     setBusyId(null);
     if (error) { fail(error); return; }
     setNewName("");
+    onChanged();
+  };
+
+  /**
+   * 순서를 한 칸 옮긴다.
+   * 이웃한 두 그룹의 sort_order를 맞바꾸는 방식이라 전체를 다시 쓰지 않아도 된다.
+   */
+  const move = async (index: number, dir: -1 | 1) => {
+    const target = groups[index];
+    const swap = groups[index + dir];
+    if (!target || !swap) return;
+
+    setBusyId(target.id);
+    setError(null);
+    const [a, b] = [target.sort_order ?? 0, swap.sort_order ?? 0];
+    // 두 값이 같으면 맞바꿔도 순서가 안 바뀌므로 서로 다른 값을 만들어 준다.
+    const [newA, newB] = a === b ? [b + dir, a] : [b, a];
+
+    const r1 = await supabase.from("groups").update({ sort_order: newA }).eq("id", target.id);
+    const r2 = await supabase.from("groups").update({ sort_order: newB }).eq("id", swap.id);
+    setBusyId(null);
+    if (r1.error) { fail(r1.error); return; }
+    if (r2.error) { fail(r2.error); return; }
     onChanged();
   };
 
@@ -115,12 +140,32 @@ export default function GroupPanel({ groups, entries, onChanged, onClose }: Prop
           <label>기존 그룹</label>
           {groups.length === 0 && <p className="hint">아직 그룹이 없습니다.</p>}
 
-          {groups.map((g) => {
+          {groups.map((g, i) => {
             const draft = drafts[g.id] ?? g.name;
             const changed = draft.trim() !== g.name && draft.trim() !== "";
             const used = counts[g.id] ?? 0;
             return (
               <div className="group-row" key={g.id}>
+                <div className="order-btns">
+                  <button
+                    className="order-btn"
+                    onClick={() => move(i, -1)}
+                    disabled={i === 0 || busyId === g.id}
+                    title="위로"
+                    aria-label="위로"
+                  >
+                    ▲
+                  </button>
+                  <button
+                    className="order-btn"
+                    onClick={() => move(i, 1)}
+                    disabled={i === groups.length - 1 || busyId === g.id}
+                    title="아래로"
+                    aria-label="아래로"
+                  >
+                    ▼
+                  </button>
+                </div>
                 <input
                   value={draft}
                   onChange={(e) => setDrafts((d) => ({ ...d, [g.id]: e.target.value }))}

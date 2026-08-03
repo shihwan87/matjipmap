@@ -19,7 +19,8 @@ export default function Home() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
-  const [activeGroup, setActiveGroup] = useState<string | "all" | "fav">("all");
+  const [activeGroup, setActiveGroup] = useState<string | "all" | "fav" | "none">("all");
+  const [activeCuisine, setActiveCuisine] = useState<string>("all");
   const [editing, setEditing] = useState<Entry | null | undefined>(undefined);
   const [pickedCoord, setPickedCoord] = useState<{ lat: number; lng: number; address?: string } | null>(null);
   const [showAuth, setShowAuth] = useState(false);
@@ -32,7 +33,12 @@ export default function Home() {
   const load = useCallback(async () => {
     const [{ data: e }, { data: g }] = await Promise.all([
       supabase.from("entries").select("*").order("created_at", { ascending: false }),
-      supabase.from("groups").select("*").order("created_at", { ascending: true }),
+      // 그룹은 사용자가 지정한 순서(sort_order)를 따른다
+      supabase
+        .from("groups")
+        .select("*")
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true }),
     ]);
     setEntries(e || []);
     setGroups(g || []);
@@ -62,7 +68,7 @@ export default function Home() {
 
   // 선택해 둔 그룹이 삭제되면 필터가 빈 화면을 가리키게 되므로 전체로 되돌린다.
   useEffect(() => {
-    if (activeGroup === "all" || activeGroup === "fav") return;
+    if (activeGroup === "all" || activeGroup === "fav" || activeGroup === "none") return;
     if (!groups.some((g) => g.id === activeGroup)) setActiveGroup("all");
   }, [groups, activeGroup]);
 
@@ -88,9 +94,18 @@ export default function Home() {
     }
   };
 
-  const shownEntries = activeGroup === "all" ? entries
-    : activeGroup === "fav" ? entries.filter((e) => favoriteIds.has(e.id))
-    : entries.filter((e) => e.group_id === activeGroup);
+  // 지도에도 목록과 같은 필터를 적용한다 (그룹과 업종은 함께 적용)
+  const shownEntries = entries.filter((e) => {
+    if (activeGroup === "fav" && !favoriteIds.has(e.id)) return false;
+    if (activeGroup === "none" && e.group_id) return false;
+    if (activeGroup !== "all" && activeGroup !== "fav" && activeGroup !== "none"
+        && e.group_id !== activeGroup) return false;
+
+    if (activeCuisine === "none" && e.cuisine) return false;
+    if (activeCuisine !== "all" && activeCuisine !== "none" && e.cuisine !== activeCuisine) return false;
+
+    return true;
+  });
 
   return (
     <div className="app-shell">
@@ -141,6 +156,8 @@ export default function Home() {
             groups={groups}
             activeGroup={activeGroup}
             onFilterChange={setActiveGroup}
+            activeCuisine={activeCuisine}
+            onCuisineChange={setActiveCuisine}
             onEdit={(entry) => { setPickedCoord(null); setEditing(entry); }}
             onChanged={load}
             favoriteIds={favoriteIds}

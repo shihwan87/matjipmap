@@ -14,6 +14,57 @@ export const ROLE_LABEL: Record<Role, string> = {
   viewer: "열람자",
 };
 
+/**
+ * 업종 큰 분류.
+ * 목록 필터 칩으로 쓰이므로 너무 잘게 나누지 않는다.
+ * 더 세부적인 분류는 entries.category_raw("음식점>한식>냉면")에 그대로 보관한다.
+ * 여기에 항목을 더하거나 빼도 DB는 건드릴 필요가 없다.
+ */
+export const CUISINES = [
+  "한식",
+  "중식",
+  "일식",
+  "양식",
+  "아시안",
+  "분식",
+  "고기·구이",
+  "술집",
+  "카페·디저트",
+  "기타",
+] as const;
+
+export type Cuisine = (typeof CUISINES)[number];
+
+/**
+ * 네이버 검색이 준 분류 문자열에서 업종을 추정한다.
+ * 예: "음식점>한식>냉면" → "한식", "카페,디저트>베이커리" → "카페·디저트"
+ * 판단이 안 되면 null을 돌려주고, 사용자가 직접 고르게 한다.
+ */
+export function guessCuisine(raw: string | null | undefined): Cuisine | null {
+  if (!raw) return null;
+  const s = raw.replace(/\s/g, "");
+
+  // 순서가 중요하다. 더 구체적인 것을 먼저 본다
+  // (예: "일식>돈까스"는 아래 한식 규칙보다 먼저 걸려야 한다).
+  const rules: [RegExp, Cuisine][] = [
+    [/카페|디저트|베이커리|제과|빵|아이스크림|빙수|찻집/, "카페·디저트"],
+    [/술집|주점|호프|바(\b|>)|포차|이자카야|와인|칵테일|맥주/, "술집"],
+    [/중식|중국음식|마라/, "중식"],
+    [/일식|초밥|스시|돈까스|돈가스|라멘|우동|이자카야/, "일식"],
+    [/양식|이탈리|프렌치|스테이크|파스타|피자|햄버거|브런치/, "양식"],
+    [/아시아|베트남|태국|인도|쌀국수|중동|멕시/, "아시안"],
+    [/분식|떡볶이|김밥/, "분식"],
+    [/육류|고기|구이|갈비|삼겹|곱창|족발|보쌈|치킨|닭/, "고기·구이"],
+    [/한식|국밥|찌개|백반|칼국수|냉면|해장|한정식|죽|국수/, "한식"],
+  ];
+
+  for (const [re, cuisine] of rules) {
+    if (re.test(s)) return cuisine;
+  }
+  // "음식점"처럼 큰 분류만 온 경우는 단정하지 않는다
+  return null;
+}
+
 export type Entry = {
   id: string;
   name: string;
@@ -23,6 +74,10 @@ export type Entry = {
   memo: string | null;
   catchtable_url: string | null;
   group_id: string | null;
+  /** 업종 큰 분류. 검색 등록 시 자동 추정되고, 사용자가 바꿀 수 있다 */
+  cuisine: string | null;
+  /** 네이버 검색이 준 원본 분류 문자열 (표시용) */
+  category_raw: string | null;
   /** 등록한 사용자 id */
   created_by: string | null;
   /** 등록 시점의 표시 이름 스냅샷 (비로그인 방문자에게도 보이도록 저장) */
@@ -34,6 +89,8 @@ export type Entry = {
 export type Group = {
   id: string;
   name: string;
+  /** 목록에 보여줄 순서. 그룹 관리 화면에서 바꾼다 */
+  sort_order: number;
 };
 
 export type Profile = {

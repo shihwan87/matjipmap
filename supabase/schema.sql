@@ -18,8 +18,12 @@
 create table groups (
   id uuid primary key default gen_random_uuid(),
   name text not null,
+  -- 목록에 보여줄 순서. 앱의 그룹 관리 화면에서 위/아래로 바꾼다.
+  sort_order integer not null default 0,
   created_at timestamptz default now()
 );
+
+create index groups_sort_idx on groups (sort_order);
 
 -- 맛집
 create table entries (
@@ -31,6 +35,11 @@ create table entries (
   memo text,
   catchtable_url text,
   group_id uuid references groups(id) on delete set null,
+  -- 업종 큰 분류 (한식/일식/카페·디저트 ...). 목록 필터에 쓴다.
+  -- 분류를 나중에 바꾸기 쉽도록 CHECK 제약은 걸지 않는다.
+  cuisine text,
+  -- 네이버 검색이 준 원본 분류 (예: "음식점>한식>냉면"). 세부 정보 보존용.
+  category_raw text,
   -- 등록자. 표시용 이름은 등록 시점 스냅샷으로 함께 저장해,
   -- 비로그인 방문자도 프로필 조회 없이 "등록: OO"를 볼 수 있게 한다.
   created_by uuid references auth.users(id) on delete set null,
@@ -70,6 +79,7 @@ create table feedback (
 );
 
 create index feedback_status_created_idx on feedback (status, created_at desc);
+create index entries_cuisine_idx on entries (cuisine);
 
 -- ------------------------------------------------------------
 -- 2. 권한 판정 헬퍼

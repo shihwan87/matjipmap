@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { supabase, Entry, Group } from "@/lib/supabaseClient";
+import { supabase, Entry, Group, CUISINES, guessCuisine } from "@/lib/supabaseClient";
 import { useAuth } from "./AuthProvider";
 
 type Props = {
@@ -31,6 +31,10 @@ export default function EntryForm({ groups, initial, pickedCoord, onDone, onClos
   const [memo, setMemo] = useState(initial?.memo || "");
   const [catchtableUrl, setCatchtableUrl] = useState(initial?.catchtable_url || "");
   const [groupId, setGroupId] = useState(initial?.group_id || groups[0]?.id || "");
+  // 업종. 검색으로 등록하면 자동으로 채워지고, 직접 고를 수도 있다.
+  const [cuisine, setCuisine] = useState(initial?.cuisine || "");
+  // 네이버가 준 원본 분류 (예: "음식점>한식>냉면"). 표시·보관용.
+  const [categoryRaw, setCategoryRaw] = useState(initial?.category_raw || "");
   const [saving, setSaving] = useState(false);
   const [geocoding, setGeocoding] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -122,6 +126,11 @@ export default function EntryForm({ groups, initial, pickedCoord, onDone, onClos
     const addr = p.address || p.jibunAddress;
     setAddress(addr);
 
+    // 네이버 분류에서 업종을 추정해 미리 채워준다. 사용자가 바꿀 수 있다.
+    setCategoryRaw(p.category || "");
+    const guessed = guessCuisine(p.category);
+    if (guessed) setCuisine(guessed);
+
     if (p.lat != null && p.lng != null) {
       setCoord({ lat: p.lat, lng: p.lng });
     } else {
@@ -143,6 +152,8 @@ export default function EntryForm({ groups, initial, pickedCoord, onDone, onClos
       memo: memo.trim() || null,
       catchtable_url: catchtableUrl.trim() || null,
       group_id: groupId || null,
+      cuisine: cuisine || null,
+      category_raw: categoryRaw.trim() || null,
       lat: coord?.lat ?? null,
       lng: coord?.lng ?? null,
       updated_at: new Date().toISOString(),
@@ -234,13 +245,26 @@ export default function EntryForm({ groups, initial, pickedCoord, onDone, onClos
           )}
         </div>
 
-        <div className="field">
-          <label>그룹</label>
-          <select value={groupId} onChange={(e) => setGroupId(e.target.value)}>
-            {groups.map((g) => (
-              <option key={g.id} value={g.id}>{g.name}</option>
-            ))}
-          </select>
+        <div className="row-2">
+          <div className="field">
+            <label>그룹</label>
+            <select value={groupId} onChange={(e) => setGroupId(e.target.value)}>
+              <option value="">미분류</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label>업종</label>
+            <select value={cuisine} onChange={(e) => setCuisine(e.target.value)}>
+              <option value="">미분류</option>
+              {CUISINES.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+            {categoryRaw && <p className="hint">네이버 분류: {categoryRaw}</p>}
+          </div>
         </div>
 
         <div className="field">

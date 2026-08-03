@@ -208,6 +208,23 @@ h1, h2, h3, .brand {
   margin-bottom: 10px;
 }
 
+/* 그룹 / 업종 두 줄로 나뉜 필터 */
+.filter-block {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-label {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: #a99f8c;
+  width: 28px;
+  padding-bottom: 10px;
+}
+
+.filter-block .filter-row { flex: 1; min-width: 0; }
+
 .list-tools {
   display: flex;
   gap: 8px;
@@ -369,6 +386,29 @@ h1, h2, h3, .brand {
   text-align: right;
 }
 
+/* 순서 바꾸기 (▲▼) */
+.order-btns {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+}
+
+.order-btn {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  width: 22px;
+  height: 17px;
+  font-size: 8px;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+}
+
+.order-btn:first-child { border-radius: 5px 5px 0 0; border-bottom: none; }
+.order-btn:last-child { border-radius: 0 0 5px 5px; }
+.order-btn:disabled { opacity: 0.3; cursor: default; }
+
 .chip {
   border: 1px solid var(--line);
   background: #fff;
@@ -444,6 +484,7 @@ h1, h2, h3, .brand {
 }
 
 .tag.fav { background: #eef1e9; color: var(--sage); }
+.tag.cuisine { background: #eae4f0; color: #5d4f70; }
 
 /* 주의를 끌어야 하는 상태 표시 (예: 좌표 없어 지도에 안 뜸) */
 .tag.warn { background: #f7e4dc; color: var(--accent); }

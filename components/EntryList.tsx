@@ -1,14 +1,18 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Entry, Group, supabase } from "@/lib/supabaseClient";
+import { Entry, Group, supabase, CUISINES } from "@/lib/supabaseClient";
 import { useAuth } from "./AuthProvider";
 
 type Props = {
   entries: Entry[];
   groups: Group[];
-  activeGroup: string | "all" | "fav";
-  onFilterChange: (v: string | "all" | "fav") => void;
+  /** "all" 전체 · "fav" 내 즐겨찾기 · "none" 그룹 미분류 · 그 외는 그룹 id */
+  activeGroup: string | "all" | "fav" | "none";
+  onFilterChange: (v: string | "all" | "fav" | "none") => void;
+  /** "all" 또는 업종명 */
+  activeCuisine: string;
+  onCuisineChange: (v: string) => void;
   onEdit: (entry: Entry) => void;
   onChanged: () => void;
   /** 내가 즐겨찾기한 entry id 모음 */
@@ -31,6 +35,8 @@ export default function EntryList({
   groups,
   activeGroup,
   onFilterChange,
+  activeCuisine,
+  onCuisineChange,
   onEdit,
   onChanged,
   favoriteIds,
@@ -63,10 +69,17 @@ export default function EntryList({
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     const filtered = entries.filter((e) => {
-      // 그룹/즐겨찾기 필터 — 즐겨찾기는 "내" 즐겨찾기 기준
+      // 1) 그룹 · 즐겨찾기 (즐겨찾기는 "내" 즐겨찾기 기준)
       if (activeGroup === "fav" && !favoriteIds.has(e.id)) return false;
-      if (activeGroup !== "all" && activeGroup !== "fav" && e.group_id !== activeGroup) return false;
-      // 검색어 필터 (이름/주소/메모)
+      if (activeGroup === "none" && e.group_id) return false;
+      if (activeGroup !== "all" && activeGroup !== "fav" && activeGroup !== "none"
+          && e.group_id !== activeGroup) return false;
+
+      // 2) 업종 — 두 필터는 함께(AND) 적용된다
+      if (activeCuisine === "none" && e.cuisine) return false;
+      if (activeCuisine !== "all" && activeCuisine !== "none" && e.cuisine !== activeCuisine) return false;
+
+      // 3) 검색어 (이름/주소/메모)
       if (!q) return true;
       return [e.name, e.address, e.memo].some((f) => (f || "").toLowerCase().includes(q));
     });
@@ -79,18 +92,51 @@ export default function EntryList({
     }
     // "recent"는 부모에서 이미 created_at 내림차순으로 넘어오므로 그대로 사용
     return sorted;
-  }, [entries, activeGroup, query, sort, favoriteIds]);
+  }, [entries, activeGroup, activeCuisine, query, sort, favoriteIds]);
+
+  // 업종 칩에 개수를 함께 보여주면 어디에 뭐가 있는지 한눈에 들어온다.
+  const cuisineCounts = useMemo(() => {
+    const map: Record<string, number> = {};
+    entries.forEach((e) => {
+      const key = e.cuisine || "none";
+      map[key] = (map[key] ?? 0) + 1;
+    });
+    return map;
+  }, [entries]);
 
   return (
     <div className="list-wrap">
-      <div className="filter-row">
-        <button className={`chip ${activeGroup === "all" ? "active" : ""}`} onClick={() => onFilterChange("all")}>전체</button>
-        <button className={`chip ${activeGroup === "fav" ? "active" : ""}`} onClick={() => onFilterChange("fav")}>내 즐겨찾기</button>
-        {groups.map((g) => (
-          <button key={g.id} className={`chip ${activeGroup === g.id ? "active" : ""}`} onClick={() => onFilterChange(g.id)}>
-            {g.name}
+      <div className="filter-block">
+        <span className="filter-label">그룹</span>
+        <div className="filter-row">
+          <button className={`chip ${activeGroup === "all" ? "active" : ""}`} onClick={() => onFilterChange("all")}>전체</button>
+          <button className={`chip ${activeGroup === "fav" ? "active" : ""}`} onClick={() => onFilterChange("fav")}>내 즐겨찾기</button>
+          {groups.map((g) => (
+            <button key={g.id} className={`chip ${activeGroup === g.id ? "active" : ""}`} onClick={() => onFilterChange(g.id)}>
+              {g.name}
+            </button>
+          ))}
+          <button className={`chip ${activeGroup === "none" ? "active" : ""}`} onClick={() => onFilterChange("none")}>미분류</button>
+        </div>
+      </div>
+
+      <div className="filter-block">
+        <span className="filter-label">업종</span>
+        <div className="filter-row">
+          <button className={`chip ${activeCuisine === "all" ? "active" : ""}`} onClick={() => onCuisineChange("all")}>전체</button>
+          {CUISINES.map((c) => (
+            <button
+              key={c}
+              className={`chip ${activeCuisine === c ? "active" : ""}`}
+              onClick={() => onCuisineChange(c)}
+            >
+              {c}{cuisineCounts[c] ? ` ${cuisineCounts[c]}` : ""}
+            </button>
+          ))}
+          <button className={`chip ${activeCuisine === "none" ? "active" : ""}`} onClick={() => onCuisineChange("none")}>
+            미분류{cuisineCounts["none"] ? ` ${cuisineCounts["none"]}` : ""}
           </button>
-        ))}
+        </div>
       </div>
 
       <div className="list-tools">
@@ -146,6 +192,7 @@ export default function EntryList({
                 {(entry.lat == null || entry.lng == null) && (
                   <span className="tag warn">지도 표시 안 됨 · 좌표 없음</span>
                 )}
+                {entry.cuisine && <span className="tag cuisine">{entry.cuisine}</span>}
                 {groupName(entry.group_id) && <span className="tag">{groupName(entry.group_id)}</span>}
                 {entry.created_by_name && <span className="tag">등록: {entry.created_by_name}</span>}
                 <a className="tag" href={naverMapLink(entry)} target="_blank" rel="noreferrer">네이버지도</a>
