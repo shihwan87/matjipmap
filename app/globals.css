@@ -347,6 +347,28 @@ h1, h2, h3, .brand {
   border-radius: 8px;
 }
 
+/* ---------- 그룹 관리 ---------- */
+
+.group-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.group-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.group-count {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: #a99f8c;
+  min-width: 34px;
+  text-align: right;
+}
+
 .chip {
   border: 1px solid var(--line);
   background: #fff;

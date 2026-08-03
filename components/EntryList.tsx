@@ -16,6 +16,8 @@ type Props = {
   onToggleFavorite: (entryId: string) => void;
   /** 로그인 안 한 사용자가 ★를 눌렀을 때 로그인 창을 띄우기 위한 콜백 */
   onRequireLogin: () => void;
+  /** 그룹 관리 화면 열기 (편집 권한이 있을 때만 노출) */
+  onManageGroups: () => void;
 };
 
 type SortKey = "recent" | "name" | "fav";
@@ -34,6 +36,7 @@ export default function EntryList({
   favoriteIds,
   onToggleFavorite,
   onRequireLogin,
+  onManageGroups,
 }: Props) {
   const { session, canEdit } = useAuth();
   const [query, setQuery] = useState("");
@@ -102,6 +105,11 @@ export default function EntryList({
           <option value="name">이름순</option>
           <option value="fav">즐겨찾기순</option>
         </select>
+        {canEdit && (
+          <button className="mini-btn" onClick={onManageGroups} title="그룹 추가·이름변경·삭제">
+            그룹
+          </button>
+        )}
       </div>
 
       {error && <p className="form-error">{error}</p>}

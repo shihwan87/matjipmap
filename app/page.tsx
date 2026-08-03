@@ -9,6 +9,7 @@ import AuthPanel from "@/components/AuthPanel";
 import AdminPanel from "@/components/AdminPanel";
 import FeedbackPanel from "@/components/FeedbackPanel";
 import FeedbackAdmin from "@/components/FeedbackAdmin";
+import GroupPanel from "@/components/GroupPanel";
 import { useAuth } from "@/components/AuthProvider";
 
 export default function Home() {
@@ -25,6 +26,7 @@ export default function Home() {
   const [showAdmin, setShowAdmin] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [showFeedbackAdmin, setShowFeedbackAdmin] = useState(false);
+  const [showGroups, setShowGroups] = useState(false);
 
   // 맛집·그룹은 로그인 여부와 무관하게 누구나 읽을 수 있다.
   const load = useCallback(async () => {
@@ -57,6 +59,12 @@ export default function Home() {
   }, [load]);
 
   useEffect(() => { loadFavorites(); }, [loadFavorites]);
+
+  // 선택해 둔 그룹이 삭제되면 필터가 빈 화면을 가리키게 되므로 전체로 되돌린다.
+  useEffect(() => {
+    if (activeGroup === "all" || activeGroup === "fav") return;
+    if (!groups.some((g) => g.id === activeGroup)) setActiveGroup("all");
+  }, [groups, activeGroup]);
 
   // 즐겨찾기 토글 — 화면을 먼저 바꾸고 서버에 반영한다(실패 시 되돌림).
   const toggleFavorite = async (entryId: string) => {
@@ -138,6 +146,7 @@ export default function Home() {
             favoriteIds={favoriteIds}
             onToggleFavorite={toggleFavorite}
             onRequireLogin={() => setShowAuth(true)}
+            onManageGroups={() => setShowGroups(true)}
           />
         )}
       </div>
@@ -167,6 +176,14 @@ export default function Home() {
       )}
       {showFeedbackAdmin && isAdmin && (
         <FeedbackAdmin onClose={() => setShowFeedbackAdmin(false)} />
+      )}
+      {showGroups && canEdit && (
+        <GroupPanel
+          groups={groups}
+          entries={entries}
+          onChanged={load}
+          onClose={() => setShowGroups(false)}
+        />
       )}
     </div>
   );
