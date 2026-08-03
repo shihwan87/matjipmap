@@ -3,33 +3,35 @@
 등록 폼의 **"가게 이름으로 검색"**을 쓰려면 이 설정이 필요합니다.
 설정하지 않아도 나머지 기능(지도 클릭, 주소로 좌표 찾기, 등록·수정)은 모두 정상 동작합니다.
 
-## 왜 이런 게 필요한가
+## 왜 중계 프로그램이 필요한가
 
-네이버 검색 API는 열쇠(Client Secret) 도용을 막으려고 **브라우저에서 직접 부르지 못하게** 막아뒀습니다.
-반드시 서버를 거쳐야 하는데, 우리 앱은 GitHub Pages에 올라가는 정적 사이트라 서버가 없습니다.
+네이버 검색 API는 **서버에서만 호출할 수 있습니다.** 열쇠 도용을 막으려고 브라우저에서
+직접 부르지 못하게 막아뒀기 때문입니다. (검색 API 신청 화면에 "웹 서비스 URL" 항목이
+없는 것도 같은 이유입니다 — 도메인 대신 열쇠로 인증합니다.)
 
+우리 앱은 GitHub Pages에 올라가는 정적 사이트라 서버가 없습니다.
 그래서 이미 쓰고 있는 **Supabase에 아주 작은 중계 프로그램**을 하나 올립니다.
-브라우저가 Supabase에 물어보면, Supabase가 네이버에 대신 물어보고 결과만 돌려주는 방식입니다.
+브라우저가 Supabase에 물어보면 Supabase가 네이버에 대신 물어보고 결과만 돌려주는 방식입니다.
 열쇠는 Supabase 안에만 있고 브라우저로 절대 나가지 않습니다.
 
 ---
 
-## 1단계. 네이버 검색 API 키 발급 (카드 불필요)
+## 1단계. 검색 API 신청 — NAVER API Hub
 
-지도 API(NCP)와는 **다른 서비스**입니다. 별도로 발급받아야 합니다.
+검색 API는 **NCP(ncloud.com)의 NAVER API Hub** 상품으로 옮겨졌습니다.
+예전 developers.naver.com 경로는 더 이상 쓰지 않습니다.
 
-1. https://developers.naver.com 접속 → 네이버 계정으로 로그인
-2. **Application → 애플리케이션 등록**
-3. 애플리케이션 이름: `맛집지도`
-4. 사용 API에서 **검색** 선택
-5. 환경 추가: **WEB 설정** → 서비스 URL에 `https://shihwan87.github.io` 입력
-6. 등록하면 나오는 **Client ID**와 **Client Secret** 복사
+1. https://www.ncloud.com/product/applicationService/naverApiHub 접속
+2. 이용 신청 → **검색** API 선택
+3. 발급된 **Client ID**와 **Client Secret** 복사
 
-> 검색 API는 무료이며 하루 호출 한도가 넉넉합니다. 가족 단위 사용은 한도에 닿지 않습니다.
+> 지도 API 키(`ncpKeyId`)와는 **다른 값**입니다. 헷갈리지 마세요.
+> "웹 서비스 URL" 입력란이 없는 것이 정상입니다.
 
 ## 2단계. Supabase에 열쇠 보관
 
-Supabase 대시보드 → **Edge Functions → Secrets** (또는 Project Settings → Edge Functions)
+Supabase 대시보드 → 좌측 **Edge Functions → Secrets**
+(버전에 따라 Project Settings → Edge Functions 아래에 있을 수 있습니다)
 
 | 이름 | 값 |
 |---|---|
@@ -41,14 +43,14 @@ Supabase 대시보드 → **Edge Functions → Secrets** (또는 Project Setting
 
 ## 3단계. 중계 함수 올리기
 
-### 방법 A. Supabase 대시보드 (설치할 것 없음)
+### 방법 A. Supabase 대시보드 (설치할 것 없음, 권장)
 
-1. Supabase 대시보드 → **Edge Functions** → **Create a new function**
-2. 이름: `search-place`
-3. 편집 창에 `supabase/functions/search-place/index.ts` 파일 내용을 **전체 복사해 붙여넣기**
-4. **Deploy** 클릭
+1. 대시보드 → **Edge Functions** → **Deploy a new function** → **Via Editor**
+2. 함수 이름: **`search-place`** ← 정확히 이 이름이어야 앱이 찾습니다
+3. 편집기 내용을 전부 지우고 `supabase/functions/search-place/index.ts` 내용을 **통째로** 붙여넣기
+4. **Deploy**
 
-### 방법 B. 명령어 (Supabase CLI 설치 필요)
+### 방법 B. 명령어 (Supabase CLI 필요)
 
 ```bash
 npx supabase login
@@ -58,20 +60,27 @@ npx supabase functions deploy search-place
 
 ## 4단계. 확인
 
-앱에서 로그인한 뒤 등록 폼을 열고, 가게 이름을 넣어 **검색**을 눌러보세요.
+앱에서 **로그인한 뒤** 등록 폼을 열고 가게 이름을 검색해 보세요.
 
 | 화면에 나오는 메시지 | 원인과 해결 |
 |---|---|
 | 결과가 잘 나옴 | 완료 |
 | `서버에 네이버 검색 API 키가 설정되지 않았습니다` | 2단계 Secrets 미등록 |
 | `로그인이 필요합니다` | 로그아웃 상태. 로그인 후 재시도 |
-| `검색에 실패했습니다` | 3단계 함수 배포가 안 됨 |
+| `검색에 실패했습니다` | 3단계 함수 배포 안 됨, 또는 함수 이름 오타 |
+| `네이버 검색 실패 (401)` | 1단계 키가 틀렸거나 검색 API 미신청 |
 
 ---
 
-## 참고
+## 호출 규격 (참고)
 
-- 지역검색 API는 **한 번에 최대 5건**까지만 돌려줍니다. 검색어를 구체적으로 넣으면 정확도가 올라갑니다
+```
+GET https://naverapihub.apigw.ntruss.com/search/v1/local?query=...&display=5
+헤더: X-NCP-APIGW-API-KEY-ID, X-NCP-APIGW-API-KEY
+```
+
+- 한 번에 **최대 5건**까지만 돌려줍니다. 검색어를 구체적으로 넣으면 정확도가 올라갑니다
   (예: `밀도` 보다 `성수동 밀도`).
-- 검색 결과의 좌표 형식이 예상과 다르면, 앱이 자동으로 주소를 Geocoding해서 좌표를 채웁니다.
+- 좌표(mapx/mapy)는 표기 형식이 상품·시기에 따라 달라, 함수가 소수·정수 두 형식을 모두
+  판별합니다. 판별에 실패하면 앱이 주소를 Geocoding해 좌표를 채웁니다.
 - 검색은 **로그인한 사용자만** 쓸 수 있습니다. 검색 한도를 보호하기 위한 제한입니다.

@@ -43,26 +43,34 @@ function stripTags(html: string): string {
     .trim();
 }
 
+/** 한국 영역 안의 위경도인지 확인한다. */
+function inKorea(lat: number, lng: number): boolean {
+  return lng >= 124 && lng <= 132 && lat >= 33 && lat <= 43;
+}
+
 /**
  * mapx/mapy를 위경도로 바꾼다.
  *
- * 네이버 지역검색 API의 좌표 형식은 시기에 따라 달랐다.
- *   - 현재: WGS84 위경도에 10^7을 곱한 정수 (예: 경도 127.05 → 1270500000)
- *   - 과거: KATEC(TM128) 평면좌표 (예: 310000 수준)
- * 값의 크기로 형식을 판별하고, KATEC으로 보이면 변환하지 않고 null을 돌려준다.
- * 그 경우 앱이 주소를 Geocoding해서 좌표를 채우므로 결과적으로 문제가 없다.
+ * 좌표 표기가 시기·상품에 따라 달라서 형식을 값으로 판별한다.
+ *   - 소수 표기: 127.0532 (그대로 사용)
+ *   - 정수 표기: 1270532000 (10^7로 나눔)
+ *   - 과거 KATEC(TM128) 평면좌표: 변환식이 필요해 여기서는 처리하지 않는다
+ * 판별에 실패하면 null을 돌려주고, 앱이 주소를 Geocoding해 좌표를 채운다.
  */
 function toLatLng(mapx: string, mapy: string): { lat: number; lng: number } | null {
   const x = Number(mapx);
   const y = Number(mapy);
   if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
 
-  // WGS84 × 10^7 형식인지 확인 (경도 124~132, 위도 33~43 범위를 벗어나면 버린다)
-  const lng = x / 1e7;
-  const lat = y / 1e7;
-  if (lng >= 124 && lng <= 132 && lat >= 33 && lat <= 43) return { lat, lng };
+  // 1) 이미 소수 위경도로 오는 경우
+  if (inKorea(y, x)) return { lat: y, lng: x };
 
-  return null; // KATEC 등 알 수 없는 형식 → 앱에서 주소로 보정
+  // 2) 10^7을 곱한 정수로 오는 경우
+  const lat = y / 1e7;
+  const lng = x / 1e7;
+  if (inKorea(lat, lng)) return { lat, lng };
+
+  return null; // 알 수 없는 형식 → 앱에서 주소로 보정
 }
 
 Deno.serve(async (req) => {
@@ -80,6 +88,8 @@ Deno.serve(async (req) => {
     });
 
   try {
+    // NAVER API Hub(NCP)에서 발급받은 검색 API 키.
+    // 지도 API 키(ncpKeyId)와는 별개의 값이다.
     const clientId = Deno.env.get("NAVER_SEARCH_CLIENT_ID");
     const clientSecret = Deno.env.get("NAVER_SEARCH_CLIENT_SECRET");
     if (!clientId || !clientSecret) {
@@ -103,16 +113,15 @@ Deno.serve(async (req) => {
       return json({ error: "검색어를 입력해 주세요." }, 400);
     }
 
-    // display는 지역검색 API 상한이 5다.
-    const url = new URL("https://openapi.naver.com/v1/search/local.json");
+    // NAVER API Hub 지역 검색. display 상한이 5다.
+    const url = new URL("https://naverapihub.apigw.ntruss.com/search/v1/local");
     url.searchParams.set("query", query.trim());
     url.searchParams.set("display", "5");
-    url.searchParams.set("sort", "random");
 
     const res = await fetch(url, {
       headers: {
-        "X-Naver-Client-Id": clientId,
-        "X-Naver-Client-Secret": clientSecret,
+        "X-NCP-APIGW-API-KEY-ID": clientId,
+        "X-NCP-APIGW-API-KEY": clientSecret,
       },
     });
 
