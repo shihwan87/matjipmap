@@ -28,6 +28,15 @@ export default function MapView({ entries, onMapClick, onMarkerClick, center, fa
   // 지도 객체가 준비되면 true. 마커 이펙트가 지도 로드 완료를 기다리도록 하는 신호.
   const [ready, setReady] = useState(false);
 
+  // 지도는 한 번만 초기화되므로, 그때 등록한 클릭 핸들러는 "첫 렌더 시점의 props"를
+  // 계속 붙들게 된다. 첫 렌더에는 아직 로그인 확인 전이라 편집 권한이 없어
+  // 콜백이 undefined이고, 이후 관리자로 로그인해도 클릭이 무시된다.
+  // 최신 콜백을 ref에 담아 핸들러가 항상 현재 값을 읽도록 한다.
+  const onMapClickRef = useRef(onMapClick);
+  const onMarkerClickRef = useRef(onMarkerClick);
+  useEffect(() => { onMapClickRef.current = onMapClick; }, [onMapClick]);
+  useEffect(() => { onMarkerClickRef.current = onMarkerClick; }, [onMarkerClick]);
+
   // 네이버지도 스크립트 로드 + 지도 초기화
   useEffect(() => {
     const clientId = process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID;
@@ -41,11 +50,13 @@ export default function MapView({ entries, onMapClick, onMarkerClick, center, fa
         zoom: 14,
       });
       window.naver.maps.Event.addListener(mapObj.current, "click", (e: any) => {
+        const handler = onMapClickRef.current;
+        if (!handler) return; // 편집 권한이 없으면 무시
         const lat = e.coord.lat();
         const lng = e.coord.lng();
         // 역지오코딩(좌표 → 주소)은 NCP에서 Reverse Geocoding API가 켜져 있을 때만 동작.
         // 없으면 조용히 좌표만 전달한다.
-        if (onMapClick && window.naver.maps.Service?.reverseGeocode) {
+        if (window.naver.maps.Service?.reverseGeocode) {
           window.naver.maps.Service.reverseGeocode(
             {
               coords: new window.naver.maps.LatLng(lat, lng),
@@ -60,11 +71,11 @@ export default function MapView({ entries, onMapClick, onMarkerClick, center, fa
                 const a = response?.v2?.address;
                 address = a?.roadAddress || a?.jibunAddress || undefined;
               }
-              onMapClick(lat, lng, address);
+              handler(lat, lng, address);
             }
           );
         } else {
-          onMapClick?.(lat, lng);
+          handler(lat, lng);
         }
       });
       setReady(true);
@@ -106,9 +117,9 @@ export default function MapView({ entries, onMapClick, onMarkerClick, center, fa
             }
           : undefined,
       });
-      if (onMarkerClick) {
-        window.naver.maps.Event.addListener(marker, "click", () => onMarkerClick(entry));
-      }
+      window.naver.maps.Event.addListener(marker, "click", () => {
+        onMarkerClickRef.current?.(entry);
+      });
       markers.current.push(marker);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps

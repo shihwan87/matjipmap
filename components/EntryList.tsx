@@ -134,6 +134,10 @@ export default function EntryList({
               {entry.address && <p className="entry-addr">{entry.address}</p>}
               {entry.memo && <p className="entry-memo">{entry.memo}</p>}
               <div className="entry-tags">
+                {/* 좌표가 없으면 지도에 찍히지 않는다. 이유를 눈에 보이게 알려준다. */}
+                {(entry.lat == null || entry.lng == null) && (
+                  <span className="tag warn">지도 표시 안 됨 · 좌표 없음</span>
+                )}
                 {groupName(entry.group_id) && <span className="tag">{groupName(entry.group_id)}</span>}
                 {entry.created_by_name && <span className="tag">등록: {entry.created_by_name}</span>}
                 <a className="tag" href={naverMapLink(entry)} target="_blank" rel="noreferrer">네이버지도</a>

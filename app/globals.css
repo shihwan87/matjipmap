@@ -338,6 +338,9 @@ h1, h2, h3, .brand {
 
 .tag.fav { background: #eef1e9; color: var(--sage); }
 
+/* 주의를 끌어야 하는 상태 표시 (예: 좌표 없어 지도에 안 뜸) */
+.tag.warn { background: #f7e4dc; color: var(--accent); }
+
 .entry-actions {
   display: flex;
   flex-direction: column;
