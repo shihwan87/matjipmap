@@ -31,19 +31,27 @@ h1, h2, h3, .brand {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   padding: 12px 16px;
   border-bottom: 1px solid var(--line);
   background: var(--paper);
 }
 
+/* 폭이 좁아지면 제목부터 줄어들고, 탭과 계정 버튼은 절대 밀려나지 않게 한다. */
 .brand {
   font-size: 20px;
   letter-spacing: -0.02em;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tabs {
   display: flex;
   gap: 4px;
+  flex: 0 0 auto;
 }
 
 .tab-btn {
@@ -74,6 +82,13 @@ h1, h2, h3, .brand {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex: 0 0 auto;
+}
+
+/* 아이폰 등 좁은 화면에서는 제목을 숨겨 계정 영역을 확보한다. */
+@media (max-width: 420px) {
+  .brand { display: none; }
+  .account-name { max-width: 70px; }
 }
 
 .account-name {

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase, Profile, Role } from "@/lib/supabaseClient";
 
@@ -33,31 +33,67 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   const [profile, setProfile] = useState<Profile | null>(null);
   const [ready, setReady] = useState(false);
 
-  // 로그인한 사용자의 프로필(역할)을 가져온다.
-  const loadProfile = useCallback(async (userId: string | undefined) => {
+  const userId = session?.user?.id;
+
+  // 세션 추적.
+  // 주의: onAuthStateChange 콜백 안에서 supabase 호출을 await 하면 인증 라이브러리
+  // 내부 잠금과 얽혀 응답이 오지 않을 수 있다(탭이 여러 개일 때 특히). 그래서 여기서는
+  // 상태만 동기적으로 바꾸고, 프로필 조회는 아래 별도 effect에서 처리한다.
+  useEffect(() => {
+    let alive = true;
+
+    // 구독 즉시 INITIAL_SESSION 이벤트로 현재 세션이 전달된다.
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+      if (!alive) return;
+      setSession(next);
+      setReady(true);
+    });
+
+    // 보조 경로 — 위 이벤트가 오지 않는 경우에도 화면이 멈추지 않도록.
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (!alive) return;
+        setSession(data.session);
+      })
+      .catch(() => {
+        // 네트워크 실패 등으로 세션 확인이 안 되면 비로그인으로 간주하고 진행한다.
+      })
+      .finally(() => {
+        if (alive) setReady(true);
+      });
+
+    // 최후의 안전장치: 어떤 이유로든 위 두 경로가 모두 응답하지 않아도
+    // 로그인 버튼이 사라진 채로 남지 않게 한다.
+    const fallback = setTimeout(() => {
+      if (alive) setReady(true);
+    }, 3000);
+
+    return () => {
+      alive = false;
+      clearTimeout(fallback);
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+
+  // 로그인한 사용자의 프로필(역할)을 가져온다. 세션이 바뀔 때만 실행된다.
+  useEffect(() => {
     if (!userId) {
       setProfile(null);
       return;
     }
-    const { data } = await supabase.from("profiles").select("*").eq("id", userId).single();
-    setProfile((data as Profile) || null);
-  }, []);
-
-  useEffect(() => {
-    // 새로고침 후에도 로그인 상태를 복구
-    supabase.auth.getSession().then(async ({ data }) => {
-      setSession(data.session);
-      await loadProfile(data.session?.user.id);
-      setReady(true);
-    });
-
-    // 로그인/로그아웃 시 상태 갱신
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, next) => {
-      setSession(next);
-      await loadProfile(next?.user.id);
-    });
-    return () => sub.subscription.unsubscribe();
-  }, [loadProfile]);
+    let alive = true;
+    supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      // 가입 직후 등 프로필 행이 아직 없을 수 있으므로 single() 대신 maybeSingle()
+      .maybeSingle()
+      .then(({ data }) => {
+        if (alive) setProfile((data as Profile) ?? null);
+      });
+    return () => { alive = false; };
+  }, [userId]);
 
   // 아래 세 함수는 실패 시 사용자에게 보여줄 한국어 메시지를, 성공 시 null을 반환한다.
   const signIn = async (email: string, password: string) => {
