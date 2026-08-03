@@ -56,6 +56,21 @@ create table favorites (
   primary key (user_id, entry_id)
 );
 
+-- 사용자 의견 (버그 제보·기능 제안). 관리자가 모아 개발에 넘긴다.
+create table feedback (
+  id uuid primary key default gen_random_uuid(),
+  kind text not null default 'bug' check (kind in ('bug', 'idea', 'etc')),
+  body text not null,
+  screen text,          -- 어느 화면에서 남겼는지 (map | list)
+  user_agent text,      -- 기기·브라우저 정보 (아이폰 전용 문제 등을 가리기 위해)
+  status text not null default 'open' check (status in ('open', 'done', 'wontfix')),
+  created_by uuid references auth.users(id) on delete set null,
+  created_by_name text,
+  created_at timestamptz default now()
+);
+
+create index feedback_status_created_idx on feedback (status, created_at desc);
+
 -- ------------------------------------------------------------
 -- 2. 권한 판정 헬퍼
 --    security definer로 만들어 RLS 정책 안에서 profiles를 읽어도
@@ -126,6 +141,7 @@ alter table groups enable row level security;
 alter table entries enable row level security;
 alter table profiles enable row level security;
 alter table favorites enable row level security;
+alter table feedback enable row level security;
 
 -- 맛집: 누구나 읽기, 편집자 이상만 쓰기
 create policy "entries_select_public" on entries
@@ -160,6 +176,17 @@ create policy "favorites_insert_own" on favorites
   for insert with check (auth.uid() = user_id);
 create policy "favorites_delete_own" on favorites
   for delete using (auth.uid() = user_id);
+
+-- 의견: 로그인한 사용자만 남길 수 있고(주소가 공개되어 있어 익명 등록은 막는다),
+--       본인 것과 관리자 전체 조회만 허용한다
+create policy "feedback_insert_authenticated" on feedback
+  for insert with check (auth.uid() is not null and auth.uid() = created_by);
+create policy "feedback_select_own_or_admin" on feedback
+  for select using (auth.uid() = created_by or public.is_admin());
+create policy "feedback_update_admin" on feedback
+  for update using (public.is_admin()) with check (public.is_admin());
+create policy "feedback_delete_admin" on feedback
+  for delete using (public.is_admin());
 
 -- ------------------------------------------------------------
 -- 5. 실시간 동기화 대상 등록

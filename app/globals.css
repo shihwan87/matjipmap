@@ -301,6 +301,52 @@ h1, h2, h3, .brand {
   margin: 14px 0;
 }
 
+/* ---------- 의견 보내기 / 받은 의견 ---------- */
+
+.kind-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.fb-row {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.fb-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.fb-meta {
+  font-size: 11px;
+  color: #a99f8c;
+}
+
+.fb-body {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: #45403a;
+  white-space: pre-wrap;
+}
+
+.fb-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.export-box {
+  margin: 16px 0;
+  padding: 12px;
+  background: #f6efe3;
+  border-radius: 8px;
+}
+
 .chip {
   border: 1px solid var(--line);
   background: #fff;

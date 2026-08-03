@@ -43,3 +43,32 @@ export type Profile = {
   role: Role;
   created_at: string;
 };
+
+/** 의견 종류 */
+export type FeedbackKind = "bug" | "idea" | "etc";
+/** 처리 상태 */
+export type FeedbackStatus = "open" | "done" | "wontfix";
+
+export const FEEDBACK_KIND_LABEL: Record<FeedbackKind, string> = {
+  bug: "잘못 동작해요",
+  idea: "이런 게 있으면 좋겠어요",
+  etc: "그 외",
+};
+
+export const FEEDBACK_STATUS_LABEL: Record<FeedbackStatus, string> = {
+  open: "미처리",
+  done: "반영함",
+  wontfix: "보류",
+};
+
+export type Feedback = {
+  id: string;
+  kind: FeedbackKind;
+  body: string;
+  screen: string | null;
+  user_agent: string | null;
+  status: FeedbackStatus;
+  created_by: string | null;
+  created_by_name: string | null;
+  created_at: string;
+};

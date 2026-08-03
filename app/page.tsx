@@ -7,6 +7,8 @@ import EntryList from "@/components/EntryList";
 import EntryForm from "@/components/EntryForm";
 import AuthPanel from "@/components/AuthPanel";
 import AdminPanel from "@/components/AdminPanel";
+import FeedbackPanel from "@/components/FeedbackPanel";
+import FeedbackAdmin from "@/components/FeedbackAdmin";
 import { useAuth } from "@/components/AuthProvider";
 
 export default function Home() {
@@ -21,6 +23,8 @@ export default function Home() {
   const [pickedCoord, setPickedCoord] = useState<{ lat: number; lng: number; address?: string } | null>(null);
   const [showAuth, setShowAuth] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [showFeedbackAdmin, setShowFeedbackAdmin] = useState(false);
 
   // 맛집·그룹은 로그인 여부와 무관하게 누구나 읽을 수 있다.
   const load = useCallback(async () => {
@@ -95,8 +99,12 @@ export default function Home() {
                 {profile?.display_name || "사용자"}
                 <span className="role-badge">{role !== "anon" ? ROLE_LABEL[role] : ""}</span>
               </span>
+              <button className="mini-btn" onClick={() => setShowFeedback(true)}>의견</button>
               {isAdmin && (
-                <button className="mini-btn" onClick={() => setShowAdmin(true)}>관리</button>
+                <>
+                  <button className="mini-btn" onClick={() => setShowFeedbackAdmin(true)}>받은의견</button>
+                  <button className="mini-btn" onClick={() => setShowAdmin(true)}>관리</button>
+                </>
               )}
               <button className="mini-btn" onClick={signOut}>로그아웃</button>
             </>
@@ -150,6 +158,16 @@ export default function Home() {
 
       {showAuth && <AuthPanel onClose={() => setShowAuth(false)} />}
       {showAdmin && isAdmin && <AdminPanel onClose={() => setShowAdmin(false)} />}
+      {showFeedback && (
+        <FeedbackPanel
+          screen={tab}
+          onClose={() => setShowFeedback(false)}
+          onRequireLogin={() => { setShowFeedback(false); setShowAuth(true); }}
+        />
+      )}
+      {showFeedbackAdmin && isAdmin && (
+        <FeedbackAdmin onClose={() => setShowFeedbackAdmin(false)} />
+      )}
     </div>
   );
 }
