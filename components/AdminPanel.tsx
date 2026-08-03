@@ -33,6 +33,49 @@ export default function AdminPanel({ onClose }: { onClose: () => void }) {
     load();
   }, []);
 
+  /**
+   * 계정 삭제.
+   * 계정 삭제에는 마스터 키가 필요해 브라우저에서 직접 할 수 없다.
+   * Supabase 중계 함수(delete-user)에 요청하고, 권한 확인은 그쪽에서 한다.
+   */
+  const removeUser = async (target: Profile) => {
+    if (target.id === me?.id) {
+      alert("본인 계정은 지울 수 없습니다.");
+      return;
+    }
+    const name = target.display_name || "이 사용자";
+    const ok = confirm(
+      `${name} 계정을 삭제할까요?\n\n` +
+        `· 이 사람이 등록한 맛집은 지워지지 않습니다\n` +
+        `· 이 사람의 즐겨찾기와 의견은 함께 사라집니다\n` +
+        `· 되돌릴 수 없습니다`
+    );
+    if (!ok) return;
+
+    setSavingId(target.id);
+    setError(null);
+    const { data, error } = await supabase.functions.invoke("delete-user", {
+      body: { userId: target.id },
+    });
+    setSavingId(null);
+
+    if (error) {
+      // 함수가 배포되지 않았거나 서버가 거절한 경우
+      let message = "삭제에 실패했습니다. (관리자: delete-user 함수 배포 필요)";
+      try {
+        const body = await (error as any).context?.json?.();
+        if (body?.error) message = body.error;
+      } catch {
+        // 응답 본문을 읽을 수 없으면 기본 메시지 유지
+      }
+      setError(message);
+      return;
+    }
+    if (data?.error) { setError(data.error); return; }
+
+    setRows((prev) => prev.filter((r) => r.id !== target.id));
+  };
+
   const changeRole = async (target: Profile, role: Role) => {
     if (role === target.role) return;
 
@@ -97,6 +140,16 @@ export default function AdminPanel({ onClose }: { onClose: () => void }) {
                 </option>
               ))}
             </select>
+            {/* 본인 계정은 실수로 지우지 못하도록 버튼 자체를 감춘다 */}
+            {row.id !== me?.id && (
+              <button
+                className="mini-btn"
+                onClick={() => removeUser(row)}
+                disabled={savingId === row.id}
+              >
+                삭제
+              </button>
+            )}
           </div>
         ))}
 
