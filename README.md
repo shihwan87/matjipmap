@@ -2,11 +2,14 @@
 
 가족/친구와 함께 쓰는 개인 맛집지도. iOS는 PWA로 설치, Windows는 브라우저로 사용.
 
+> **다른 컴퓨터에서 이어서 작업하려면** [SETUP-NEW-DEVICE.md](SETUP-NEW-DEVICE.md)를 보세요.
+> 이 문서는 처음부터 새로 만드는 경우의 안내입니다.
+
 ## 필요한 것 3가지
 
 1. **Supabase** 계정 (무료) — 공유 DB
 2. **Naver Cloud Platform** 계정 (무료) — 지도 API 키
-3. **Vercel** 계정 (무료) — 실제 배포
+3. **GitHub** 계정 (무료) — 코드 보관 + 실제 배포(GitHub Pages)
 
 ## 1단계. Supabase 설정
 
