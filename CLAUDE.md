@@ -8,7 +8,7 @@
 
 ## 기술 스택
 
-- Next.js 14 (App Router) + TypeScript, `output: "export"` 정적 빌드
+- Next.js 16 (App Router, Turbopack) + React 19 + TypeScript, `output: "export"` 정적 빌드
 - Supabase (Postgres + Auth + Realtime + Edge Functions)
 - Naver Maps JS SDK v3 (`ncpKeyId`, `submodules=geocoder`)
 - 순수 CSS (Tailwind 없음)
@@ -90,3 +90,13 @@ Supabase Auth는 이메일이 필수라, 이름 계정은 이름을 UTF-8 16진�
 
 관리자 화면 `받은의견`에서 `파일로 저장 (.md)` → 프로젝트 폴더에 넣고
 Claude Code에 "feedback 파일 보고 고쳐줘". 파일에 작업 지시와 기기·화면 맥락이 들어있다.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

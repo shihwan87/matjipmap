@@ -4,6 +4,9 @@ import type { MetadataRoute } from "next";
 // 하위 경로 배포(GitHub Pages)에서도 아이콘 경로가 맞도록 basePath를 붙여 생성한다.
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
+// output: "export" 에서는 메타데이터 라우트도 정적으로 고정해야 한다 (Next 16 필수).
+export const dynamic = "force-static";
+
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "맛집지도",
