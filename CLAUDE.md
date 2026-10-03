@@ -20,11 +20,13 @@
 app/            layout.tsx, page.tsx, globals.css, manifest.ts
 components/     AuthProvider · AuthPanel · AdminPanel · MapView
                 EntryForm · EntryList · GroupPanel
-                FeedbackPanel · FeedbackAdmin
-lib/            supabaseClient.ts  (타입 · 업종표 · 이름↔이메일 변환)
+                FeedbackPanel · FeedbackAdmin · CandidatePanel
+lib/            supabaseClient.ts  (타입 · 업종표 · 이름↔이메일 변환 · nameKey)
 supabase/       schema.sql (신규 설치용 전체)
-                migration-001~004.sql (기존 설치용 증분)
+                migration-001~005.sql (기존 설치용 증분)
                 functions/search-place, functions/delete-user
+tools/insta/    인스타 저장 컬렉션 → 맛집 후보 파이프라인 (Python, PC에서 수동 실행)
+                run.py · extract.py · verify.py · store.py · README.md · PATTERN.md
 ```
 
 `app/page.tsx`가 오케스트레이터. 데이터 로딩·필터 상태·패널 표시를 모두 여기서 관리하고
@@ -40,6 +42,8 @@ supabase/       schema.sql (신규 설치용 전체)
 | `profiles` | auth.users와 1:1. `role`(admin/editor/viewer) |
 | `favorites` | 개인별 즐겨찾기 (user_id, entry_id) |
 | `feedback` | 사용자 의견 + 처리 상태 |
+| `insta_posts` | 처리한 인스타 포스트. 재실행 시 건너뜀 |
+| `candidates` | 인스타에서 뽑은 맛집 후보. `status` pending/registered/rejected, `sources`(출처 포스트들) |
 
 ## 권한
 
@@ -78,6 +82,12 @@ Supabase Auth는 이메일이 필수라, 이름 계정은 이름을 UTF-8 16진�
   엔드포인트 `naverapihub.apigw.ntruss.com/search/v1/local`, 헤더 `X-NCP-APIGW-API-KEY-ID/KEY`.
 - **GitHub Pages는 하위 경로 배포**라 `NEXT_PUBLIC_BASE_PATH`로 basePath를 준다.
   로컬 dev는 빈 값이므로 루트에서 뜬다.
+- **Next 16은 `output: "export"`에서 `manifest.ts` 같은 메타데이터 라우트에
+  `export const dynamic = "force-static"`을 요구한다.** 빼면 빌드가 깨진다.
+- **`next dev`가 CLAUDE.md 끝에 `nextjs-agent-rules` 블록을 덧붙인다.** 지워도 다시 생기니 그냥 커밋한다.
+- **새 PC에서 `npm`이 안 보이면 터미널을 다시 연다.** Node 설치 전에 연 터미널은 PATH를 모른다.
+- **Microsoft Store용 `python` 별칭은 `AppData\Roaming`을 가린다.** 그 아래 있는 Claude 실행 파일·npm 전역
+  패키지가 Python에서 "없음"으로 보인다. `tools/insta/run.cmd`가 진짜 python.exe로 다시 실행해 피해 간다.
 
 ## 작업 흐름
 
@@ -85,6 +95,18 @@ Supabase Auth는 이메일이 필수라, 이름 계정은 이름을 UTF-8 16진�
 2. DB 변경이 있으면 Supabase SQL Editor에서 마이그레이션 먼저 실행
 3. `npm run build`로 검증
 4. commit + push → GitHub Actions가 자동 배포
+
+## 인스타 → 후보 → 등록
+
+`tools/insta/run.py`(PC)가 인스타 저장 컬렉션을 받아 OCR·Claude(`claude -p`)로 가게를 뽑고,
+`search-place`로 네이버에서 실재 확인한 뒤 `candidates`에 올린다. 편집자는 앱 상단 **[후보]**에서
+[등록](등록 폼이 채워져 열림) / [제외]를 고른다. 자세한 사용법은 `tools/insta/README.md`.
+
+- 상호 비교는 `nameKey()`(TS) = `name_key()`(Python). 소문자 + 글자·숫자 외 제거. 두 쪽을 같이 고친다.
+- 제외는 그 건만 닫는다. 같은 상호가 다른 포스트에서 또 나오면 새 후보가 된다.
+  대기중 후보는 상호당 하나(부분 유니크 인덱스 `candidates_pending_name_key`).
+- 스크립트는 앱 계정(편집자 이상)으로 로그인해 RLS를 그대로 탄다. 서비스 키를 PC에 두지 않는다.
+- 인스타 저장 해제 자동화는 일부러 만들지 않았다 (계정 잠김 위험).
 
 ## 의견 → 개발 순환
 

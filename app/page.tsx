@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { supabase, Entry, Group, GroupMap, EntryGroup, ROLE_LABEL } from "@/lib/supabaseClient";
+import {
+  supabase, Entry, Group, GroupMap, EntryGroup, ROLE_LABEL, Candidate, CUISINES, guessCuisine,
+} from "@/lib/supabaseClient";
 import MapView from "@/components/MapView";
 import EntryList from "@/components/EntryList";
 import EntryForm from "@/components/EntryForm";
@@ -10,6 +12,7 @@ import AdminPanel from "@/components/AdminPanel";
 import FeedbackPanel from "@/components/FeedbackPanel";
 import FeedbackAdmin from "@/components/FeedbackAdmin";
 import GroupPanel from "@/components/GroupPanel";
+import CandidatePanel from "@/components/CandidatePanel";
 import { useAuth } from "@/components/AuthProvider";
 
 export default function Home() {
@@ -30,6 +33,11 @@ export default function Home() {
   const [showFeedback, setShowFeedback] = useState(false);
   const [showFeedbackAdmin, setShowFeedbackAdmin] = useState(false);
   const [showGroups, setShowGroups] = useState(false);
+  const [showCandidates, setShowCandidates] = useState(false);
+  // 후보 패널에서 [등록]을 눌러 등록 폼이 열린 경우. 저장되면 그 후보를 '등록됨'으로 바꾼다.
+  const [registering, setRegistering] = useState<Candidate | null>(null);
+  // 후보 패널을 다시 불러오게 하는 신호 (등록 완료 후 증가)
+  const [candidateRefresh, setCandidateRefresh] = useState(0);
 
   // 맛집·그룹은 로그인 여부와 무관하게 누구나 읽을 수 있다.
   const load = useCallback(async () => {
@@ -105,6 +113,47 @@ export default function Home() {
     }
   };
 
+  /** 후보 → 등록 폼 초기값. 업종은 네이버 분류에서 추정하고, 없으면 추출 단계의 힌트를 쓴다. */
+  const candidateToEntry = (c: Candidate): Partial<Entry> => {
+    const hint =
+      c.cuisine_hint && (CUISINES as readonly string[]).includes(c.cuisine_hint) ? c.cuisine_hint : null;
+    return {
+      name: c.name,
+      address: c.address,
+      lat: c.lat,
+      lng: c.lng,
+      cuisine: guessCuisine(c.category_raw) ?? hint,
+      category_raw: c.category_raw,
+      // 어느 포스트에서 왔는지 메모에 남겨 나중에 다시 찾아볼 수 있게 한다
+      memo: c.sources.map((s) => `인스타 @${s.username ?? "?"}: ${s.post_url}`).join("\n"),
+    };
+  };
+
+  const startRegister = (c: Candidate) => {
+    setRegistering(c);
+    setPickedCoord(null);
+    setEditing(null); // null = 새 맛집 등록 폼
+  };
+
+  /** 등록 폼이 저장되면 후보를 '등록됨'으로 바꾸고 만들어진 맛집과 연결한다. */
+  const finishRegister = async (entryId: string) => {
+    if (!registering) return;
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from("candidates")
+      .update({
+        status: "registered",
+        entry_id: entryId,
+        decided_by: session?.user.id ?? null,
+        decided_at: now,
+        updated_at: now,
+      })
+      .eq("id", registering.id);
+    if (error) alert("맛집은 저장됐지만 후보 상태 변경에 실패했습니다: " + error.message);
+    setRegistering(null);
+    setCandidateRefresh((n) => n + 1);
+  };
+
   // 지도에도 목록과 같은 필터를 적용한다 (그룹과 업종은 함께 적용)
   const shownEntries = entries.filter((e) => {
     const ids = groupMap.get(e.id) ?? [];
@@ -134,6 +183,9 @@ export default function Home() {
                 {profile?.display_name || "사용자"}
                 <span className="role-badge">{role !== "anon" ? ROLE_LABEL[role] : ""}</span>
               </span>
+              {canEdit && (
+                <button className="mini-btn" onClick={() => setShowCandidates(true)}>후보</button>
+              )}
               <button className="mini-btn" onClick={() => setShowFeedback(true)}>의견</button>
               {isAdmin && (
                 <>
@@ -185,14 +237,24 @@ export default function Home() {
         <button className="fab" onClick={() => { setPickedCoord(null); setEditing(null); }}>+</button>
       )}
 
+      {/* 후보 패널은 등록 폼보다 먼저 그려서, 폼이 패널 위에 겹치게 한다 */}
+      {showCandidates && canEdit && (
+        <CandidatePanel
+          entries={entries}
+          refreshKey={candidateRefresh}
+          onRegister={startRegister}
+          onClose={() => setShowCandidates(false)}
+        />
+      )}
+
       {editing !== undefined && canEdit && (
         <EntryForm
           groups={groups}
-          initial={editing || undefined}
+          initial={registering ? candidateToEntry(registering) : editing || undefined}
           initialGroupIds={editing ? groupMap.get(editing.id) ?? [] : []}
           pickedCoord={pickedCoord}
-          onDone={() => { setEditing(undefined); load(); }}
-          onClose={() => setEditing(undefined)}
+          onDone={(entryId) => { setEditing(undefined); finishRegister(entryId); load(); }}
+          onClose={() => { setEditing(undefined); setRegistering(null); }}
         />
       )}
 

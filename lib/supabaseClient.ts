@@ -168,3 +168,54 @@ export type Feedback = {
   created_by_name: string | null;
   created_at: string;
 };
+
+/**
+ * 상호 비교용 키. 소문자로 바꾸고 글자·숫자가 아닌 것(공백·기호·이모지)은 전부 뺀다.
+ * 예: "밀도 성수점" → "밀도성수점", "Cafe Onion" → "cafeonion"
+ * tools/insta/verify.py의 name_key()와 반드시 같은 규칙이어야 한다
+ * (스크립트가 올린 후보와 앱에 등록된 맛집을 같은 키로 비교하므로).
+ */
+export function nameKey(name: string): string {
+  return name.normalize("NFC").toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+}
+
+/** 인스타 후보 처리 상태 */
+export type CandidateStatus = "pending" | "registered" | "rejected";
+
+export const CANDIDATE_STATUS_LABEL: Record<CandidateStatus, string> = {
+  pending: "대기",
+  registered: "등록됨",
+  rejected: "제외",
+};
+
+/** 후보가 나온 인스타 포스트 한 건 */
+export type CandidateSource = {
+  shortcode: string;
+  post_url: string;
+  username: string | null;
+  posted_at: string | null;
+  /** 캡션 앞부분 */
+  snippet: string | null;
+};
+
+/** 인스타에서 뽑은 맛집 후보. tools/insta 스크립트가 올리고, 편집자가 앱에서 결정한다. */
+export type Candidate = {
+  id: string;
+  name: string;
+  name_key: string;
+  address: string | null;
+  lat: number | null;
+  lng: number | null;
+  category_raw: string | null;
+  cuisine_hint: string | null;
+  telephone: string | null;
+  /** 네이버 지역검색으로 실제 가게임을 확인했는지 */
+  verified: boolean;
+  sources: CandidateSource[];
+  status: CandidateStatus;
+  entry_id: string | null;
+  decided_by: string | null;
+  decided_at: string | null;
+  created_at: string;
+  updated_at: string;
+};

@@ -14,3 +14,10 @@ out/
 .DS_Store
 *.tsbuildinfo
 next-env.d.ts
+
+# 인스타 후보 파이프라인 작업물 (사진·세션 쿠키·로그인 정보 — 절대 올리면 안 됨)
+tools/insta/posts/
+tools/insta/cookies.txt
+tools/insta/archive.sqlite3
+tools/insta/.env
+tools/insta/__pycache__/

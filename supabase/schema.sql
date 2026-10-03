@@ -90,6 +90,48 @@ create table feedback (
 create index feedback_status_created_idx on feedback (status, created_at desc);
 create index entries_cuisine_idx on entries (cuisine);
 
+-- 처리한 인스타 포스트. tools/insta 스크립트가 재실행될 때 여기 있는 포스트는 건너뛴다.
+create table insta_posts (
+  shortcode text primary key,          -- 인스타 포스트 고유 코드 (URL 끝부분)
+  post_url text,
+  username text,
+  posted_at timestamptz,
+  caption text,
+  -- candidate: 후보를 만들었음 / already: 전부 기등록이라 건너뜀
+  -- no_venue: 맛집 정보 없음 / failed: 후보는 뽑았으나 검증 실패 (재시도 가능)
+  result text not null check (result in ('candidate', 'already', 'no_venue', 'failed')),
+  processed_at timestamptz default now()
+);
+
+-- 인스타에서 뽑은 맛집 후보. 편집자가 앱의 [후보] 화면에서 등록/제외를 결정한다.
+-- 제외는 그 건만 닫는다. 다른 포스트에서 다시 나오면 새 후보로 올라온다.
+create table candidates (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  -- 비교용 키: 소문자 + 공백·기호 제거. 앱(nameKey)과 스크립트(name_key)가 같은 규칙을 쓴다.
+  name_key text not null,
+  address text,
+  lat double precision,
+  lng double precision,
+  category_raw text,       -- 네이버 분류 원본
+  cuisine_hint text,       -- 추출 단계가 추정한 업종 (네이버 분류가 없을 때 보조)
+  telephone text,
+  verified boolean not null default false,   -- 네이버 지역검색으로 존재 확인됨
+  -- 출처 포스트 목록 [{ shortcode, post_url, username, posted_at, snippet }]
+  sources jsonb not null default '[]'::jsonb,
+  status text not null default 'pending' check (status in ('pending', 'registered', 'rejected')),
+  entry_id uuid references entries(id) on delete set null,
+  decided_by uuid references auth.users(id) on delete set null,
+  decided_at timestamptz,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create index candidates_status_idx on candidates (status, created_at desc);
+create index candidates_name_key_idx on candidates (name_key);
+-- 대기중 후보는 상호당 하나만
+create unique index candidates_pending_name_key on candidates (name_key) where status = 'pending';
+
 -- ------------------------------------------------------------
 -- 2. 권한 판정 헬퍼
 --    security definer로 만들어 RLS 정책 안에서 profiles를 읽어도
@@ -183,6 +225,8 @@ alter table profiles enable row level security;
 alter table favorites enable row level security;
 alter table feedback enable row level security;
 alter table entry_groups enable row level security;
+alter table insta_posts enable row level security;
+alter table candidates enable row level security;
 
 -- 맛집: 누구나 읽기, 편집자 이상만 쓰기
 create policy "entries_select_public" on entries
@@ -236,6 +280,12 @@ create policy "feedback_update_admin" on feedback
   for update using (public.is_admin()) with check (public.is_admin());
 create policy "feedback_delete_admin" on feedback
   for delete using (public.is_admin());
+
+-- 인스타 후보: 편집자 이상만 (열람자·비로그인에게는 아직 보여줄 단계가 아님)
+create policy "insta_posts_all_editor" on insta_posts
+  for all using (public.can_edit()) with check (public.can_edit());
+create policy "candidates_all_editor" on candidates
+  for all using (public.can_edit()) with check (public.can_edit());
 
 -- ------------------------------------------------------------
 -- 5. 실시간 동기화 대상 등록

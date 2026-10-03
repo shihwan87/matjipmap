@@ -11,7 +11,8 @@ type Props = {
   pickedCoord?: { lat: number; lng: number; address?: string } | null;
   /** 수정할 때 이미 붙어 있는 그룹 id 목록 */
   initialGroupIds?: string[];
-  onDone: () => void;
+  /** 저장이 끝나면 저장된 맛집 id를 넘긴다 (후보 등록 시 후보와 연결하는 데 쓴다) */
+  onDone: (entryId: string) => void;
   onClose: () => void;
 };
 
@@ -221,13 +222,14 @@ export default function EntryForm({
     }
 
     // 맛집을 저장한 뒤에야 그룹 연결을 붙일 수 있다 (새 맛집은 여기서 id가 정해지므로).
-    const groupError = await syncGroups((data as { id: string }).id);
+    const entryId = (data as { id: string }).id;
+    const groupError = await syncGroups(entryId);
     setSaving(false);
     if (groupError) {
       setError("맛집은 저장됐지만 그룹 연결에 실패했습니다: " + groupError);
       return;
     }
-    onDone();
+    onDone(entryId);
   };
 
   return (
