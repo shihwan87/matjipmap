@@ -88,7 +88,8 @@ Claude 없이 쓰려면 `--no-llm` 옵션으로 규칙 방식만 씁니다. 정�
 이 폴더에서:
 
 ```bash
-.un.cmd
+.
+un.cmd
 ```
 
 (`run.cmd`는 `python run.py`를 대신 실행해 줍니다. Windows의 Microsoft Store용 `python` 별칭은
@@ -100,20 +101,23 @@ AppData\Roaming을 못 봐서 Claude 실행 파일을 찾지 못하는데, 이 �
 처음 돌릴 때는 먼저 결과만 보고 싶다면:
 
 ```bash
-.un.cmd process --dry-run --limit 10
+.
+un.cmd process --dry-run --limit 10
 ```
 
 ### 옵션
 
 | 명령 | 하는 일 |
 |---|---|
-| `.un.cmd download` | 인스타에서 받기만 |
-| `.un.cmd process` | 받아둔 것 처리만 |
+| `.
+un.cmd download` | 인스타에서 받기만 |
+| `.
+un.cmd process` | 받아둔 것 처리만 |
 | `--retry-failed` | 네이버에서 못 찾았던 포스트 다시 시도 |
 | `--no-llm` | Claude 없이 규칙만으로 |
 | `--dry-run` | DB에 쓰지 않고 결과만 보기 |
 | `--limit 10` | 앞에서 10개만 |
-| `--ocr-images 0` | 사진 글씨 읽기 생략 (빠름, 캡션만 봄) |
+| `--ocr-images 0` | 사진 글씨 읽기 생략 (빠름, 캡션만 봄). 기본은 포스트당 3장 |
 
 ---
 
@@ -131,7 +135,8 @@ AppData\Roaming을 못 봐서 Claude 실행 파일을 찾지 못하는데, 이 �
 | `search-place: 검색에 실패` | Supabase에 search-place 함수 미배포 (`supabase/functions/README.md`) |
 | 후보 화면에 `후보 테이블이 없습니다` | 위 1번 마이그레이션 실행 |
 | `[OCR 비활성]` | `pip install rapidocr-onnxruntime` 다시. 캡션만으로는 계속 동작함 |
-| `claude 실행 파일을 찾지 못해` | `python run.py` 대신 `.un.cmd`로 실행. 그래도 안 되면 `.env`의 `CLAUDE_EXE`에 경로 지정 |
+| `claude 실행 파일을 찾지 못해` | `python run.py` 대신 `.
+un.cmd`로 실행. 그래도 안 되면 `.env`의 `CLAUDE_EXE`에 경로 지정 |
 
 ### 주의
 

@@ -90,7 +90,9 @@ def verify_venue(search: NaverSearch, v: Venue) -> dict[str, Any] | None:
     queries.append(v.name)
     for q in queries:
         for hit in search(q):
-            addr = hit.get("address") or hit.get("jibunAddress") or ""
-            if similar(v.name, hit.get("name", "")) and area_ok(v.area, addr):
+            # 도로명 주소에는 동네 이름이 없을 때가 많다 ("마포구 토정로 33-1").
+            # 지번 주소와 가게 이름("익스첼 합정본점")까지 합쳐서 동네를 찾는다.
+            where = " ".join(filter(None, [hit.get("name"), hit.get("address"), hit.get("jibunAddress")]))
+            if similar(v.name, hit.get("name", "")) and area_ok(v.area, where):
                 return hit
     return None

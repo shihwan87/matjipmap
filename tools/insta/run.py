@@ -11,7 +11,8 @@ tools/insta 폴더에서 실행한다.
   --no-llm          Claude 없이 규칙만으로 추출
   --dry-run         DB에 쓰지 않고 결과만 보여주기
   --limit N         앞에서 N개 포스트만
-  --ocr-images N    포스트당 OCR할 사진 수 (기본 1, 0이면 OCR 생략)
+  --ocr-images N    포스트당 OCR할 사진 수 (기본 3, 0이면 OCR 생략)
+                    "맛집 10곳" 같은 모음 글은 가게 이름이 2번째 사진부터 나온다
 
 흐름은 PATTERN.md를 따른다: download → read(OCR) → extract → VALIDATE → act.
 처리한 포스트는 Supabase insta_posts에 기록되어 다시 보지 않는다.
@@ -266,7 +267,7 @@ def main() -> None:
     ap.add_argument("--no-llm", action="store_true")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--limit", type=int, default=0)
-    ap.add_argument("--ocr-images", type=int, default=1)
+    ap.add_argument("--ocr-images", type=int, default=3)
     args = ap.parse_args()
 
     settings = Settings()
