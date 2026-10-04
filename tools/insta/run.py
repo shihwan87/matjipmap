@@ -8,12 +8,16 @@ tools/insta 폴더에서 실행한다.
 
 옵션 (process에만)
   --retry-failed    검증에 실패했던 포스트를 다시 시도
+  --retry-no-venue  "맛집 없음"으로 끝난 포스트를 다시 시도 (사진 전부 읽기)
   --no-llm          Claude 없이 규칙만으로 추출
   --dry-run         DB에 쓰지 않고 결과만 보여주기
   --limit N         앞에서 N개 포스트만
-  --ocr-images N    포스트당 OCR할 사진 수 (기본 3, 0이면 OCR 생략)
-                    "맛집 10곳" 같은 모음 글은 가게 이름이 2번째 사진부터 나온다
+  --ocr-images N    2단계에서 포스트당 OCR할 최대 사진 수 (기본 10, 0이면 OCR 생략)
 
+추출은 두 단계다.
+  1단계  캡션 + 첫 사진 글씨 → Claude. 대부분 여기서 끝난다.
+  2단계  1단계에서 아무것도 못 찾았고 사진이 더 있으면 사진을 전부 읽고 다시 묻는다.
+         여기서도 없으면 "맛집 없음"으로 기록한다.
 흐름은 PATTERN.md를 따른다: download → read(OCR) → extract → VALIDATE → act.
 처리한 포스트는 Supabase insta_posts에 기록되어 다시 보지 않는다.
 """
@@ -149,9 +153,13 @@ def process(settings: Settings, args: argparse.Namespace) -> None:
     pending = store.pending_by_key()
 
     posts = scan_posts()
+    retry = set()
+    if args.retry_failed:
+        retry.add("failed")
+    if args.retry_no_venue:
+        retry.add("no_venue")
     todo = [p for p in posts
-            if p.shortcode not in processed
-            or (args.retry_failed and processed[p.shortcode] == "failed")]
+            if p.shortcode not in processed or processed[p.shortcode] in retry]
     if args.limit:
         todo = todo[:args.limit]
     print(f"포스트 {len(posts)}개 중 처리할 것 {len(todo)}개 "
@@ -159,23 +167,37 @@ def process(settings: Settings, args: argparse.Namespace) -> None:
     if not todo:
         return
 
-    # OCR
-    if args.ocr_images > 0:
-        ocr = Ocr()
-        if ocr.enabled:
-            for i, p in enumerate(todo, 1):
-                p.ocr_headline, p.ocr_text = ocr.read(p.images[:args.ocr_images])
-                if i % 10 == 0 or i == len(todo):
-                    print(f"  OCR {i}/{len(todo)}")
-
-    # 추출
     exe = None if args.no_llm else find_claude(settings.claude_exe)
     if not args.no_llm and not exe:
         print("  [안내] claude 실행 파일을 찾지 못해 규칙 방식으로 추출합니다 (README 참고).")
-    extracted: dict[str, list[Venue]] = (
-        extract_llm(todo, exe, settings.claude_model) if exe
-        else {p.shortcode: extract_rules(p) for p in todo}
-    )
+
+    def extract(batch: list[Post]) -> dict[str, list[Venue]]:
+        if not batch:
+            return {}
+        return (extract_llm(batch, exe, settings.claude_model) if exe
+                else {p.shortcode: extract_rules(p) for p in batch})
+
+    ocr = Ocr() if args.ocr_images > 0 else None
+    if ocr and not ocr.enabled:
+        ocr = None
+
+    # 1단계: 캡션 + 첫 사진. 대부분의 포스트는 여기서 끝난다.
+    if ocr:
+        for i, p in enumerate(todo, 1):
+            p.ocr_headline, p.ocr_text = ocr.read(p.images[:1])
+            if i % 10 == 0 or i == len(todo):
+                print(f"  1단계 OCR {i}/{len(todo)}")
+    extracted: dict[str, list[Venue]] = extract(todo)
+
+    # 2단계: 1단계에서 아무것도 못 찾았고 사진이 더 있으면, 사진을 전부 읽고 다시 묻는다.
+    # ("맛집 10곳" 모음 글은 이름이 2번째 사진부터 나온다.) 여기서도 없으면 정말 없는 것.
+    if ocr:
+        second = [p for p in todo if not extracted.get(p.shortcode) and len(p.images) > 1]
+        for i, p in enumerate(second, 1):
+            p.ocr_headline, p.ocr_text = ocr.read(p.images[:args.ocr_images])
+            if i % 5 == 0 or i == len(second):
+                print(f"  2단계 OCR {i}/{len(second)} (사진 전부)")
+        extracted.update(extract(second))
 
     # 검증 → 저장
     search = NaverSearch(store.search_place)
@@ -264,10 +286,11 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("command", nargs="?", default="all", choices=["all", "download", "process"])
     ap.add_argument("--retry-failed", action="store_true")
+    ap.add_argument("--retry-no-venue", action="store_true")
     ap.add_argument("--no-llm", action="store_true")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--limit", type=int, default=0)
-    ap.add_argument("--ocr-images", type=int, default=3)
+    ap.add_argument("--ocr-images", type=int, default=10)
     args = ap.parse_args()
 
     settings = Settings()

@@ -62,7 +62,7 @@ class Ocr:
             boxes.extend(result or [])
         if not boxes:
             return None, None
-        text = " ".join(b[1] for b in boxes)[:1500]
+        text = " ".join(b[1] for b in boxes)[:4000]
         return headline(boxes), text
 
 
@@ -166,7 +166,7 @@ def extract_llm(posts: list["Post"], exe: str, model: str, batch: int = 15) -> d
             "shortcode": p.shortcode,
             "caption": (p.caption or "")[:1500],
             "ocr_headline": p.ocr_headline,
-            "ocr_text": (p.ocr_text or "")[:600] or None,
+            "ocr_text": (p.ocr_text or "")[:2500] or None,
         } for p in chunk]
         text = prompt + "\n\n입력:\n" + json.dumps(payload, ensure_ascii=False)
 
