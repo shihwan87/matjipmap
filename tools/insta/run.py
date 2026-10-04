@@ -16,8 +16,8 @@ tools/insta 폴더에서 실행한다.
 
 추출은 두 단계다.
   1단계  캡션 + 첫 사진 글씨 → Claude. 대부분 여기서 끝난다.
-  2단계  1단계에서 아무것도 못 찾았고 사진이 더 있으면 사진을 전부 읽고 다시 묻는다.
-         여기서도 없으면 "맛집 없음"으로 기록한다.
+  2단계  1단계에서 아무것도 못 찾았거나 사진이 4장 이상이면 사진을 전부 읽고 다시 묻는다.
+         결과는 1단계와 합친다. 여기서도 없으면 "맛집 없음"으로 기록한다.
 흐름은 PATTERN.md를 따른다: download → read(OCR) → extract → VALIDATE → act.
 처리한 포스트는 Supabase insta_posts에 기록되어 다시 보지 않는다.
 """
@@ -39,6 +39,7 @@ from store import Store
 from verify import NaverSearch, Venue, name_key, verify_venue
 
 IMG_EXT = {".jpg", ".jpeg", ".png", ".webp"}
+MANY_PHOTOS = 4   # 이 장수 이상이면 캡션에서 가게를 찾았어도 사진을 전부 읽는다
 
 
 @dataclass
@@ -189,15 +190,21 @@ def process(settings: Settings, args: argparse.Namespace) -> None:
                 print(f"  1단계 OCR {i}/{len(todo)}")
     extracted: dict[str, list[Venue]] = extract(todo)
 
-    # 2단계: 1단계에서 아무것도 못 찾았고 사진이 더 있으면, 사진을 전부 읽고 다시 묻는다.
-    # ("맛집 10곳" 모음 글은 이름이 2번째 사진부터 나온다.) 여기서도 없으면 정말 없는 것.
+    # 2단계: 사진을 전부 읽고 다시 묻는다. 대상은
+    #   - 1단계에서 아무것도 못 찾았고 사진이 더 있는 포스트
+    #   - 사진이 4장 이상인 포스트 (캡션에 가게 하나만 적고 사진에 열 곳을 담는 모음 글 대비)
+    # 1단계 결과와 합친다(이름 기준 중복 제거). 여기서도 없으면 정말 없는 것.
     if ocr:
-        second = [p for p in todo if not extracted.get(p.shortcode) and len(p.images) > 1]
+        second = [p for p in todo
+                  if (not extracted.get(p.shortcode) and len(p.images) > 1)
+                  or len(p.images) >= MANY_PHOTOS]
         for i, p in enumerate(second, 1):
             p.ocr_headline, p.ocr_text = ocr.read(p.images[:args.ocr_images])
             if i % 5 == 0 or i == len(second):
                 print(f"  2단계 OCR {i}/{len(second)} (사진 전부)")
-        extracted.update(extract(second))
+        for code, venues in extract(second).items():
+            seen = {name_key(v.name) for v in extracted.get(code, [])}
+            extracted[code] = extracted.get(code, []) + [v for v in venues if name_key(v.name) not in seen]
 
     # 검증 → 저장
     search = NaverSearch(store.search_place)
