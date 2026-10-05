@@ -9,6 +9,8 @@ tools/insta 폴더에서 실행한다.
 옵션 (process에만)
   --retry-failed    검증에 실패했던 포스트를 다시 시도
   --retry-no-venue  "맛집 없음"으로 끝난 포스트를 다시 시도 (사진 전부 읽기)
+  --retry-many-photos  사진 4장 이상인 포스트를 결과와 무관하게 다시 처리
+                    (규칙 변경 전에 처리된 포스트에 새 규칙을 적용할 때)
   --no-llm          Claude 없이 규칙만으로 추출
   --dry-run         DB에 쓰지 않고 결과만 보여주기
   --limit N         앞에서 N개 포스트만
@@ -160,7 +162,8 @@ def process(settings: Settings, args: argparse.Namespace) -> None:
     if args.retry_no_venue:
         retry.add("no_venue")
     todo = [p for p in posts
-            if p.shortcode not in processed or processed[p.shortcode] in retry]
+            if p.shortcode not in processed or processed[p.shortcode] in retry
+            or (args.retry_many_photos and len(p.images) >= MANY_PHOTOS)]
     if args.limit:
         todo = todo[:args.limit]
     print(f"포스트 {len(posts)}개 중 처리할 것 {len(todo)}개 "
@@ -294,6 +297,7 @@ def main() -> None:
     ap.add_argument("command", nargs="?", default="all", choices=["all", "download", "process"])
     ap.add_argument("--retry-failed", action="store_true")
     ap.add_argument("--retry-no-venue", action="store_true")
+    ap.add_argument("--retry-many-photos", action="store_true")
     ap.add_argument("--no-llm", action="store_true")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--limit", type=int, default=0)

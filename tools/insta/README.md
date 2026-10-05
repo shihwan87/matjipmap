@@ -118,6 +118,7 @@ un.cmd download` | 인스타에서 받기만 |
 un.cmd process` | 받아둔 것 처리만 |
 | `--retry-failed` | 네이버에서 못 찾았던 포스트 다시 시도 |
 | `--retry-no-venue` | "맛집 없음"으로 끝난 포스트 다시 시도 |
+| `--retry-many-photos` | 사진 4장 이상 포스트 전부 다시 처리 (규칙 바뀐 뒤 소급 적용용) |
 | `--no-llm` | Claude 없이 규칙만으로 |
 | `--dry-run` | DB에 쓰지 않고 결과만 보기 |
 | `--limit 10` | 앞에서 10개만 |
