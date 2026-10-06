@@ -11,7 +11,8 @@ from typing import Any
 
 import requests
 from supabase import create_client
-from supabase.lib.client_options import ClientOptions
+# 동기 클라이언트는 SyncClientOptions여야 한다. 기본 ClientOptions에는 storage가 없어 create_client가 죽는다.
+from supabase.lib.client_options import SyncClientOptions
 
 from config import Settings
 
@@ -30,7 +31,7 @@ class Store:
         self.url = settings.supabase_url.rstrip("/")
         self.anon_key = settings.supabase_anon_key
         # 앱과 같은 "matjib" 스키마. 테이블 이름은 그대로 쓴다.
-        self.sb = create_client(self.url, self.anon_key, options=ClientOptions(schema="matjib"))
+        self.sb = create_client(self.url, self.anon_key, options=SyncClientOptions(schema="matjib"))
 
         # 로그인 입력란과 같은 규칙: @가 없으면 이름 계정
         email = settings.login if "@" in settings.login else username_to_email(settings.login)
