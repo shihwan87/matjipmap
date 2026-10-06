@@ -26,9 +26,9 @@ components/     AuthProvider · AuthPanel · AdminPanel · MapView
                 EntryForm · EntryList · GroupPanel
                 FeedbackPanel · FeedbackAdmin · CandidatePanel
 lib/            supabaseClient.ts  (타입 · 업종표 · 이름↔이메일 변환 · nameKey)
-supabase/       schema.sql (신규 설치용 전체)
-                migration-001~005.sql (기존 설치용 증분)
-                functions/search-place, functions/delete-user
+supabase/       schema.sql (신규 설치용 전체. 단, public 스키마 기준이라 실행 후 006을 이어서 돌린다)
+                migration-001~006.sql (기존 설치용 증분. 006 = public → matjib 이전)
+                functions/search-place, functions/delete-user (둘 다 대시보드에 배포됨)
 tools/insta/    인스타 저장 컬렉션 → 맛집 후보 파이프라인 (Python, PC에서 수동 실행)
                 run.py · extract.py · verify.py · store.py · README.md · PATTERN.md
 ```
@@ -92,6 +92,12 @@ Supabase Auth는 이메일이 필수라, 이름 계정은 이름을 UTF-8 16진�
 - **새 PC에서 `npm`이 안 보이면 터미널을 다시 연다.** Node 설치 전에 연 터미널은 PATH를 모른다.
 - **Microsoft Store용 `python` 별칭은 `AppData\Roaming`을 가린다.** 그 아래 있는 Claude 실행 파일·npm 전역
   패키지가 Python에서 "없음"으로 보인다. `tools/insta/run.cmd`가 진짜 python.exe로 다시 실행해 피해 간다.
+- **Realtime 구독은 클라이언트의 `db.schema` 옵션을 따르지 않는다.** `postgres_changes`에 `schema: "matjib"`을
+  직접 적어야 한다. 틀리면 에러 없이 실시간 갱신만 멈춘다.
+- **supabase-py 동기 클라이언트에는 `SyncClientOptions`를 넘긴다.** `ClientOptions`는 `storage` 속성이 없어
+  `create_client`가 시작부터 죽는다.
+- **Edge Function은 git push로 배포되지 않는다.** 코드를 고치면 대시보드 Edge Functions에서 직접 다시 배포한다.
+  `delete-user`는 한동안 아예 배포되지 않은 채였다.
 
 ## 작업 흐름
 
