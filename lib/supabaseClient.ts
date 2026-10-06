@@ -3,7 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-export const supabase = createClient(url, anonKey);
+// 허브 Supabase 프로젝트 안의 "matjib" 스키마에 산다. 테이블 이름은 그대로 쓰고 스키마는 여기서 정한다.
+export const supabase = createClient(url, anonKey, { db: { schema: "matjib" } });
 
 /**
  * 이름으로 로그인하기 위한 내부 도메인.

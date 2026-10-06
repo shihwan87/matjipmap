@@ -78,7 +78,8 @@ export default function Home() {
     // 실시간 동기화: 다른 사람이 추가/수정/삭제하면 자동 반영
     const channel = supabase
       .channel("entries-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "entries" }, load)
+      // 스키마는 클라이언트 옵션이 아니라 여기서 직접 지정한다. createClient의 db.schema와 맞춰야 한다.
+      .on("postgres_changes", { event: "*", schema: "matjib", table: "entries" }, load)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [load]);

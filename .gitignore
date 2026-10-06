@@ -21,3 +21,6 @@ tools/insta/cookies.txt
 tools/insta/archive.sqlite3
 tools/insta/.env
 tools/insta/__pycache__/
+
+# 수동 백업 CSV (사용자 데이터 — 올리지 않음)
+backup_*/

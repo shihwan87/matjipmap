@@ -131,6 +131,10 @@ copy .env.local.example .env.local
 
 anon 키는 매우 깁니다(`eyJ...`로 시작). **전체를 복사**하세요.
 
+한 가지 더 확인: 이 Supabase 프로젝트는 여러 앱이 같이 쓰는 허브이고, 맛집지도는 그 안의 `matjib` 스키마에
+있습니다. **Project Settings → Data API → Exposed schemas**에 `matjib`이 들어 있어야 앱이 데이터를 읽습니다.
+(한 번 넣어두면 기기를 바꿔도 그대로입니다. 없으면 추가하고 Save.)
+
 ### 네이버 값 1개
 
 1. https://www.ncloud.com 로그인 → 우측 상단 **콘솔**

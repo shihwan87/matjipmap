@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
 
     // 3) 요청한 사람이 정말 관리자인지 마스터 키로 직접 확인한다.
     //    (브라우저가 보낸 말을 믿지 않는다)
-    const admin = createClient(url, serviceKey);
+    const admin = createClient(url, serviceKey, { db: { schema: "matjib" } });
 
     const { data: me } = await admin
       .from("profiles")

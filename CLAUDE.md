@@ -9,7 +9,11 @@
 ## 기술 스택
 
 - Next.js 16 (App Router, Turbopack) + React 19 + TypeScript, `output: "export"` 정적 빌드
-- Supabase (Postgres + Auth + Realtime + Edge Functions)
+- Supabase (Postgres + Auth + Realtime + Edge Functions). **여러 앱이 같이 쓰는 허브 프로젝트**이고
+  이 앱은 그 안의 **`matjib` 스키마**에 산다. 모든 클라이언트(`lib/supabaseClient.ts`, `delete-user` 함수,
+  `tools/insta/store.py`)가 `db: { schema: "matjib" }`를 넘기고, Realtime 구독도 `schema: "matjib"`을 지정한다.
+  앞으로 SQL은 테이블에 `matjib.`을 붙이거나 `set search_path = matjib, public;`으로 시작한다.
+  대시보드 Project Settings → Data API → Exposed schemas에 `matjib`이 있어야 한다.
 - Naver Maps JS SDK v3 (`ncpKeyId`, `submodules=geocoder`)
 - 순수 CSS (Tailwind 없음)
 - GitHub Pages 자동 배포 (`.github/workflows/deploy.yml`)
