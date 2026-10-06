@@ -86,6 +86,18 @@ create trigger profiles_admin_email_check
   before insert or update on matjib.profiles
   for each row execute function matjib.enforce_admin_needs_real_email();
 
+-- ---------- 3b. Realtime: app/page.tsx listens to postgres_changes on entries ----------
+-- Publication membership follows the table OID, so it normally survives the move; this makes sure.
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'matjib' and tablename = 'entries'
+  ) then
+    execute 'alter publication supabase_realtime add table matjib.entries';
+  end if;
+end $$;
+
 -- ---------- 4. Grants (custom schemas get nothing automatically) ----------
 grant all on all tables in schema matjib to anon, authenticated, service_role;
 grant all on all sequences in schema matjib to anon, authenticated, service_role;
@@ -102,6 +114,7 @@ commit;
 -- select n.nspname, p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
 --   where p.proname in ('my_role','can_edit','is_admin','handle_new_user','enforce_admin_needs_real_email');
 -- select tgname, tgrelid::regclass from pg_trigger where tgname in ('on_auth_user_created','profiles_admin_email_check');
+-- select schemaname, tablename from pg_publication_tables where pubname = 'supabase_realtime';  -- expect matjib | entries
 
 -- ---------- Rollback (only if something is wrong; reverses section 1 and 2) ----------
 -- begin;
